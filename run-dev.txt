@@ -1,0 +1,15 @@
+node:internal/modules/cjs/loader:1084
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'electron'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1084:15)
+    at Module._load (node:internal/modules/cjs/loader:929:27)
+    at c._load (node:electron/js2c/node_init:2:13672)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:171:29)
+    at ModuleJob.run (node:internal/modules/esm/module_job:194:25) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v18.18.2

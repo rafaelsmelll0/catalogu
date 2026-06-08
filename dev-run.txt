@@ -1,0 +1,13 @@
+file:///D:/Catalogu/dist-electron/main.js:1
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+CommonJS modules can always be imported via the default export, for example using:
+
+import pkg from 'electron';
+const { app, BrowserWindow, ipcMain } = pkg;
+
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:124:21)
+    at async ModuleJob.run (node:internal/modules/esm/module_job:190:5)
+
+Node.js v18.18.2
