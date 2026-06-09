@@ -13,8 +13,8 @@ import {
   getAllWatchlist, addToWatchlist, removeFromWatchlist, getWatchlistCount,
   type AddWatchlistInput,
 } from './watchlistQueries.js'
-import { importFromV2Db, type ImportProgress } from './import.js'
-import { updateAllBackdrops, type BackdropUpdateProgress } from './updateBackdrops.js'
+import { updateAllImages, type ImageUpdateProgress } from './updateImages.js'
+import fs from 'fs'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -41,22 +41,6 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   ipcMain.handle('lists:addMedia',    (_e, mediaId: number, listId: number) => addMediaToList(mediaId, listId))
   ipcMain.handle('lists:removeMedia', (_e, mediaId: number, listId: number) => removeMediaFromList(mediaId, listId))
 
-  ipcMain.handle('backup:selectDb', async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Selecionar banco do CineUp v2',
-      filters: [{ name: 'SQLite Database', extensions: ['db'] }],
-      properties: ['openFile'],
-    })
-    if (result.canceled || result.filePaths.length === 0) return null
-    return result.filePaths[0]
-  })
-
-  ipcMain.handle('backup:import', async (event, dbPath: string) => {
-    return importFromV2Db(dbPath, (progress: ImportProgress) => {
-      event.sender.send('backup:progress', progress)
-    })
-  })
-
   // Watchlist
   ipcMain.handle('watchlist:getAll', () => getAllWatchlist())
   ipcMain.handle('watchlist:add',    (_e, input: AddWatchlistInput) => {
@@ -70,10 +54,103 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   ipcMain.handle('watchlist:remove', (_e, id: number) => removeFromWatchlist(id))
   ipcMain.handle('watchlist:count',  ()               => getWatchlistCount())
 
-  ipcMain.handle('backdrop:updateAll', async (event) => {
-    return updateAllBackdrops((progress: BackdropUpdateProgress) => {
-      event.sender.send('backdrop:progress', progress)
+  // Atualizar imagens (capa + backdrop)
+  ipcMain.handle('images:updateAll', async (event) => {
+    return updateAllImages((progress: ImageUpdateProgress) => {
+      event.sender.send('images:progress', progress)
     })
+  })
+
+  // Exportar backup do banco
+  ipcMain.handle('backup:export', async () => {
+    const dbSrc = path.join(app.getPath('userData'), 'catalogu.db')
+    const result = await dialog.showSaveDialog({
+      title: 'Exportar backup do Catalogu',
+      defaultPath: `catalogu_backup_${new Date().toISOString().slice(0, 10)}.db`,
+      filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+    })
+    if (result.canceled || !result.filePath) return { success: false }
+    try {
+      fs.copyFileSync(dbSrc, result.filePath)
+      return { success: true, path: result.filePath }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  // Selecionar .db para importar
+  ipcMain.handle('backup:selectDbV3', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Selecionar backup do Catalogu',
+      filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  // Importar backup v3 (mesclar ou substituir)
+  ipcMain.handle('backup:importV3', async (_e, dbPath: string, mode: 'merge' | 'replace') => {
+    const dbDest = path.join(app.getPath('userData'), 'catalogu.db')
+    try {
+      if (mode === 'replace') {
+        const { getDatabase } = await import('./database.js')
+        try { (getDatabase() as any).close() } catch {}
+        fs.copyFileSync(dbPath, dbDest)
+        const { setDbPath } = await import('./database.js')
+        setDbPath(dbDest)
+        return { success: true, imported: 0, skipped: 0, mode: 'replace' }
+      }
+
+      const Database = (await import('better-sqlite3')).default
+      const srcDb = new Database(dbPath, { readonly: true })
+      const { getDatabase } = await import('./database.js')
+      const destDb = getDatabase()
+
+      const srcMedia = srcDb.prepare('SELECT * FROM media').all() as any[]
+      let imported = 0
+      let skipped  = 0
+
+      for (const m of srcMedia) {
+        const exists = m.tmdb_id
+          ? destDb.prepare('SELECT id FROM media WHERE tmdb_id = ?').get(m.tmdb_id)
+          : destDb.prepare('SELECT id FROM media WHERE LOWER(title) = LOWER(?) AND release_year = ?').get(m.title, m.release_year ?? '')
+
+        if (exists) { skipped++; continue }
+
+        destDb.prepare(`
+          INSERT INTO media (
+            title, release_year, synopsis, observations, rating,
+            duration, watched, cover_path, backdrop_path,
+            tipo, watched_status, tmdb_id, created_at
+          ) VALUES (
+            @title, @release_year, @synopsis, @observations, @rating,
+            @duration, @watched, @cover_path, @backdrop_path,
+            @tipo, @watched_status, @tmdb_id, @created_at
+          )
+        `).run({
+          title:          m.title,
+          release_year:   m.release_year  ?? null,
+          synopsis:       m.synopsis      ?? null,
+          observations:   m.observations  ?? null,
+          rating:         m.rating        ?? null,
+          duration:       m.duration      ?? null,
+          watched:        m.watched       ?? null,
+          cover_path:     m.cover_path    ?? null,
+          backdrop_path:  m.backdrop_path ?? null,
+          tipo:           m.tipo,
+          watched_status: m.watched_status ?? 'assistido',
+          tmdb_id:        m.tmdb_id       ?? null,
+          created_at:     m.created_at    ?? new Date().toISOString(),
+        })
+        imported++
+      }
+
+      srcDb.close()
+      return { success: true, imported, skipped, mode: 'merge' }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
   })
 }
 

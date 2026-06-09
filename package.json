@@ -14,7 +14,7 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "build": "vite build && tsc -p electron/tsconfig.json && node scripts/inject-env.mjs",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --win && node scripts/set-icon.mjs",
     "preview": "vite preview"
   },
   "build": {
@@ -103,6 +103,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "png-to-ico": "^3.0.1",
+    "rcedit": "^4.0.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -9,8 +42,8 @@ const database_js_1 = require("./database.js");
 const queries_js_1 = require("./queries.js");
 const tmdb_js_1 = require("./tmdb.js");
 const watchlistQueries_js_1 = require("./watchlistQueries.js");
-const import_js_1 = require("./import.js");
-const updateBackdrops_js_1 = require("./updateBackdrops.js");
+const updateImages_js_1 = require("./updateImages.js");
+const fs_1 = __importDefault(require("fs"));
 const isDev = process.env.NODE_ENV === 'development';
 function registerIpcHandlers() {
     electron_1.ipcMain.handle('media:getAll', () => (0, queries_js_1.getAllMedia)());
@@ -34,21 +67,6 @@ function registerIpcHandlers() {
     electron_1.ipcMain.handle('lists:getMedia', (_e, listId) => (0, queries_js_1.getMediaInList)(listId));
     electron_1.ipcMain.handle('lists:addMedia', (_e, mediaId, listId) => (0, queries_js_1.addMediaToList)(mediaId, listId));
     electron_1.ipcMain.handle('lists:removeMedia', (_e, mediaId, listId) => (0, queries_js_1.removeMediaFromList)(mediaId, listId));
-    electron_1.ipcMain.handle('backup:selectDb', async () => {
-        const result = await electron_1.dialog.showOpenDialog({
-            title: 'Selecionar banco do CineUp v2',
-            filters: [{ name: 'SQLite Database', extensions: ['db'] }],
-            properties: ['openFile'],
-        });
-        if (result.canceled || result.filePaths.length === 0)
-            return null;
-        return result.filePaths[0];
-    });
-    electron_1.ipcMain.handle('backup:import', async (event, dbPath) => {
-        return (0, import_js_1.importFromV2Db)(dbPath, (progress) => {
-            event.sender.send('backup:progress', progress);
-        });
-    });
     // Watchlist
     electron_1.ipcMain.handle('watchlist:getAll', () => (0, watchlistQueries_js_1.getAllWatchlist)());
     electron_1.ipcMain.handle('watchlist:add', (_e, input) => {
@@ -63,10 +81,104 @@ function registerIpcHandlers() {
     });
     electron_1.ipcMain.handle('watchlist:remove', (_e, id) => (0, watchlistQueries_js_1.removeFromWatchlist)(id));
     electron_1.ipcMain.handle('watchlist:count', () => (0, watchlistQueries_js_1.getWatchlistCount)());
-    electron_1.ipcMain.handle('backdrop:updateAll', async (event) => {
-        return (0, updateBackdrops_js_1.updateAllBackdrops)((progress) => {
-            event.sender.send('backdrop:progress', progress);
+    // Atualizar imagens (capa + backdrop)
+    electron_1.ipcMain.handle('images:updateAll', async (event) => {
+        return (0, updateImages_js_1.updateAllImages)((progress) => {
+            event.sender.send('images:progress', progress);
         });
+    });
+    // Exportar backup do banco
+    electron_1.ipcMain.handle('backup:export', async () => {
+        const dbSrc = path_1.default.join(electron_1.app.getPath('userData'), 'catalogu.db');
+        const result = await electron_1.dialog.showSaveDialog({
+            title: 'Exportar backup do Catalogu',
+            defaultPath: `catalogu_backup_${new Date().toISOString().slice(0, 10)}.db`,
+            filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+        });
+        if (result.canceled || !result.filePath)
+            return { success: false };
+        try {
+            fs_1.default.copyFileSync(dbSrc, result.filePath);
+            return { success: true, path: result.filePath };
+        }
+        catch (err) {
+            return { success: false, error: String(err) };
+        }
+    });
+    // Selecionar .db para importar
+    electron_1.ipcMain.handle('backup:selectDbV3', async () => {
+        const result = await electron_1.dialog.showOpenDialog({
+            title: 'Selecionar backup do Catalogu',
+            filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+            properties: ['openFile'],
+        });
+        if (result.canceled || result.filePaths.length === 0)
+            return null;
+        return result.filePaths[0];
+    });
+    // Importar backup v3 (mesclar ou substituir)
+    electron_1.ipcMain.handle('backup:importV3', async (_e, dbPath, mode) => {
+        const dbDest = path_1.default.join(electron_1.app.getPath('userData'), 'catalogu.db');
+        try {
+            if (mode === 'replace') {
+                const { getDatabase } = await Promise.resolve().then(() => __importStar(require('./database.js')));
+                try {
+                    getDatabase().close();
+                }
+                catch { }
+                fs_1.default.copyFileSync(dbPath, dbDest);
+                const { setDbPath } = await Promise.resolve().then(() => __importStar(require('./database.js')));
+                setDbPath(dbDest);
+                return { success: true, imported: 0, skipped: 0, mode: 'replace' };
+            }
+            const Database = (await Promise.resolve().then(() => __importStar(require('better-sqlite3')))).default;
+            const srcDb = new Database(dbPath, { readonly: true });
+            const { getDatabase } = await Promise.resolve().then(() => __importStar(require('./database.js')));
+            const destDb = getDatabase();
+            const srcMedia = srcDb.prepare('SELECT * FROM media').all();
+            let imported = 0;
+            let skipped = 0;
+            for (const m of srcMedia) {
+                const exists = m.tmdb_id
+                    ? destDb.prepare('SELECT id FROM media WHERE tmdb_id = ?').get(m.tmdb_id)
+                    : destDb.prepare('SELECT id FROM media WHERE LOWER(title) = LOWER(?) AND release_year = ?').get(m.title, m.release_year ?? '');
+                if (exists) {
+                    skipped++;
+                    continue;
+                }
+                destDb.prepare(`
+          INSERT INTO media (
+            title, release_year, synopsis, observations, rating,
+            duration, watched, cover_path, backdrop_path,
+            tipo, watched_status, tmdb_id, created_at
+          ) VALUES (
+            @title, @release_year, @synopsis, @observations, @rating,
+            @duration, @watched, @cover_path, @backdrop_path,
+            @tipo, @watched_status, @tmdb_id, @created_at
+          )
+        `).run({
+                    title: m.title,
+                    release_year: m.release_year ?? null,
+                    synopsis: m.synopsis ?? null,
+                    observations: m.observations ?? null,
+                    rating: m.rating ?? null,
+                    duration: m.duration ?? null,
+                    watched: m.watched ?? null,
+                    cover_path: m.cover_path ?? null,
+                    backdrop_path: m.backdrop_path ?? null,
+                    tipo: m.tipo,
+                    watched_status: m.watched_status ?? 'assistido',
+                    tmdb_id: m.tmdb_id ?? null,
+                    created_at: m.created_at ?? new Date().toISOString(),
+                });
+                imported++;
+            }
+            srcDb.close();
+            return { success: true, imported, skipped, mode: 'merge' };
+        }
+        catch (err) {
+            return { success: false, error: String(err) };
+        }
     });
 }
 function createWindow() {
