@@ -1,4 +1,5 @@
 import { theme } from '../styles/theme.ts'
+import { normalize } from '../lib/normalize.ts'
 import { Input, Select, Button, GenreMultiSelect, type SelectOption } from './ui/index.ts'
 import type { WatchlistItem } from '../types/index.ts'
 
@@ -134,9 +135,9 @@ export function applyWatchlistFilters(
     }
 
     if (filters.search.trim()) {
-      const q = filters.search.toLowerCase()
-      const inTitle    = m.title.toLowerCase().includes(q)
-      const inDirector = (m.director ?? '').toLowerCase().includes(q)
+      const q = normalize(filters.search)
+      const inTitle    = normalize(m.title).includes(q)
+      const inDirector = normalize(m.director ?? '').includes(q)
       const inYear     = (m.release_year ?? '').includes(q)
       if (!inTitle && !inDirector && !inYear) return false
     }

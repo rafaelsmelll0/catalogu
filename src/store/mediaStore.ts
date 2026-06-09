@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Media, MediaType, WatchedStatus } from '../types/index.ts'
 import { showToast } from '../components/Toast.tsx'
+import { normalize } from '../lib/normalize.ts'
 
 export type SortBy =
   | 'title_asc'
@@ -119,8 +120,8 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       if (filters.minRating > 0 && (m.rating ?? 0) < filters.minRating) return false
 
       if (filters.search) {
-        const q = filters.search.toLowerCase()
-        if (!m.title.toLowerCase().includes(q)) return false
+        const q = normalize(filters.search)
+        if (!normalize(m.title).includes(q)) return false
       }
 
       return true

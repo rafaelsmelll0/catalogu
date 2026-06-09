@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { normalize } from '../lib/normalize.ts'
 import { theme } from '../styles/theme.ts'
 import type { Media } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
@@ -97,7 +98,7 @@ export function ListasPage() {
   const mediaNotInList = allMedia.filter(m => !listMedia.some(lm => lm.id === m.id))
   const filteredToAdd  = addSearch.trim()
     ? mediaNotInList.filter(m =>
-        m.title.toLowerCase().includes(addSearch.toLowerCase()) ||
+        normalize(m.title).includes(normalize(addSearch)) ||
         (m.release_year ?? '').includes(addSearch)
       )
     : mediaNotInList
