@@ -42,72 +42,78 @@ function WatchlistCardInner({ item, onWatched, onRemove, index = 0 }: Props) {
         animation: `cardIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${Math.min(index * 0.04, 0.6)}s backwards`,
       }}
     >
-      {/* Poster */}
+      {/* Poster 2x */}
       <div style={{
-        width: '80px',
-        height: '120px',
+        width: '160px',
+        height: '240px',
         flexShrink: 0,
         background: item.cover_path
           ? `url(${item.cover_path}) center/cover no-repeat`
           : gradient,
-        position: 'relative',
-      }}>
-        <div style={{ position: 'absolute', top: theme.spacing.xs, left: theme.spacing.xs, zIndex: 1 }}>
-          <Badge size="sm" customColor={theme.colors.typeColors[item.tipo]}>
-            {item.tipo}
-          </Badge>
-        </div>
-      </div>
+      }} />
 
       {/* Conteúdo */}
       <div style={{
         flex: 1, minWidth: 0,
-        padding: `${theme.spacing.sm} ${theme.spacing.sm} ${theme.spacing.sm} 0`,
-        display: 'flex', flexDirection: 'column', gap: '6px',
+        padding: theme.spacing.md,
+        display: 'flex', flexDirection: 'column', gap: '8px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: theme.spacing.xs, flexWrap: 'wrap' }}>
+
+        {/* Linha 1: Título · Ano · Duração · Badge tipo */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: theme.spacing.xs,
+          flexWrap: 'wrap',
+        }}>
           <span style={{
-            fontSize: theme.fontSizes.ui,
+            fontSize: theme.fontSizes.body,
             fontWeight: theme.fontWeights.bold,
             color: theme.colors.textPrimary,
           }}>
             {item.title}
           </span>
           {item.release_year && (
-            <span style={{ fontSize: theme.fontSizes.tiny, color: theme.colors.textMuted }}>
+            <span style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
               {item.release_year}
             </span>
           )}
           {item.duration && (
-            <span style={{ fontSize: theme.fontSizes.tiny, color: theme.colors.textMuted }}>
+            <span style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
               · {item.tipo === 'filme'
                 ? `${Math.floor(item.duration / 60)}h ${item.duration % 60}min`
                 : `${item.duration} ep.`}
             </span>
           )}
+          <Badge size="sm" customColor={theme.colors.typeColors[item.tipo]}>
+            {item.tipo}
+          </Badge>
         </div>
 
+        {/* Diretor */}
         {item.director && (
-          <div style={{ fontSize: theme.fontSizes.tiny, color: theme.colors.textMuted }}>
+          <div style={{ fontSize: theme.fontSizes.ui, color: theme.colors.textMuted }}>
             Dir. {item.director}
           </div>
         )}
 
+        {/* Gêneros */}
         {item.genres && item.genres.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {item.genres.slice(0, 4).map(g => (
+            {item.genres.slice(0, 5).map(g => (
               <Badge key={g} variant="muted" size="sm">{g}</Badge>
             ))}
           </div>
         )}
 
+        {/* Sinopse */}
         {item.synopsis && (
           <p style={{
-            fontSize: theme.fontSizes.tiny,
+            fontSize: theme.fontSizes.ui,
             color: theme.colors.textSecondary,
-            lineHeight: 1.5,
+            lineHeight: 1.6,
             display: '-webkit-box',
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             margin: 0,
@@ -123,7 +129,7 @@ function WatchlistCardInner({ item, onWatched, onRemove, index = 0 }: Props) {
         flexDirection: 'column',
         justifyContent: 'center',
         gap: theme.spacing.xs,
-        padding: `${theme.spacing.sm} ${theme.spacing.md} ${theme.spacing.sm} 0`,
+        padding: `${theme.spacing.md} ${theme.spacing.md} ${theme.spacing.md} 0`,
         flexShrink: 0,
       }}>
         <Button
