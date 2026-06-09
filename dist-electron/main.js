@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
+const electron_updater_1 = require("electron-updater");
+const electron_log_1 = __importDefault(require("electron-log"));
 const path_1 = __importDefault(require("path"));
 const database_js_1 = require("./database.js");
 const queries_js_1 = require("./queries.js");
@@ -117,6 +119,9 @@ function registerIpcHandlers() {
         return result.filePaths[0];
     });
     // Importar backup v3 (mesclar ou substituir)
+    electron_1.ipcMain.handle('update:install', () => {
+        electron_updater_1.autoUpdater.quitAndInstall();
+    });
     electron_1.ipcMain.handle('backup:importV3', async (_e, dbPath, mode) => {
         const dbDest = path_1.default.join(electron_1.app.getPath('userData'), 'catalogu.db');
         try {
@@ -181,6 +186,25 @@ function registerIpcHandlers() {
         }
     });
 }
+function setupAutoUpdater(win) {
+    electron_updater_1.autoUpdater.logger = electron_log_1.default;
+    electron_updater_1.autoUpdater.logger.transports.file.level = 'info';
+    electron_updater_1.autoUpdater.autoInstallOnAppQuit = false;
+    electron_updater_1.autoUpdater.autoDownload = true;
+    electron_updater_1.autoUpdater.checkForUpdatesAndNotify();
+    electron_updater_1.autoUpdater.on('update-available', (info) => {
+        win.webContents.send('update:available', { version: info.version });
+    });
+    electron_updater_1.autoUpdater.on('download-progress', (progress) => {
+        win.webContents.send('update:progress', { percent: Math.round(progress.percent) });
+    });
+    electron_updater_1.autoUpdater.on('update-downloaded', () => {
+        win.webContents.send('update:downloaded');
+    });
+    electron_updater_1.autoUpdater.on('error', (err) => {
+        electron_log_1.default.error('Erro no auto-updater:', err);
+    });
+}
 function createWindow() {
     const win = new electron_1.BrowserWindow({
         width: 1400, height: 900, minWidth: 1024, minHeight: 700,
@@ -201,11 +225,13 @@ function createWindow() {
     else {
         win.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
     }
+    return win;
 }
 electron_1.app.whenReady().then(() => {
     (0, database_js_1.setDbPath)(path_1.default.join(electron_1.app.getPath('userData'), 'catalogu.db'));
     registerIpcHandlers();
-    createWindow();
+    const win = createWindow();
+    setupAutoUpdater(win);
 });
 electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin')

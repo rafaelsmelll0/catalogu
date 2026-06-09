@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { autoUpdater } from 'electron-updater'
+import log from 'electron-log'
 import path from 'path'
 import { setDbPath } from './database.js'
 import {
@@ -90,6 +92,10 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   })
 
   // Importar backup v3 (mesclar ou substituir)
+  ipcMain.handle('update:install', () => {
+    autoUpdater.quitAndInstall()
+  })
+
   ipcMain.handle('backup:importV3', async (_e, dbPath: string, mode: 'merge' | 'replace') => {
     const dbDest = path.join(app.getPath('userData'), 'catalogu.db')
     try {
@@ -154,7 +160,33 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   })
 }
 
-function createWindow() {
+function setupAutoUpdater(win: BrowserWindow) {
+  autoUpdater.logger = log
+  ;(autoUpdater.logger as any).transports.file.level = 'info'
+
+  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.autoDownload = true
+
+  autoUpdater.checkForUpdatesAndNotify()
+
+  autoUpdater.on('update-available', (info) => {
+    win.webContents.send('update:available', { version: info.version })
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    win.webContents.send('update:progress', { percent: Math.round(progress.percent) })
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    win.webContents.send('update:downloaded')
+  })
+
+  autoUpdater.on('error', (err) => {
+    log.error('Erro no auto-updater:', err)
+  })
+}
+
+function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 1024, minHeight: 700,
     backgroundColor: '#141414',
@@ -173,12 +205,14 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+  return win
 }
 
 app.whenReady().then(() => {
   setDbPath(path.join(app.getPath('userData'), 'catalogu.db'))
   registerIpcHandlers()
-  createWindow()
+  const win = createWindow()
+  setupAutoUpdater(win)
 })
 
 app.on('window-all-closed', () => {

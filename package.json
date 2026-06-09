@@ -1,6 +1,6 @@
 {
   "name": "catalogu",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Catálogo pessoal de filmes e séries",
   "author": "Rafael",
   "private": true,
@@ -61,6 +61,12 @@
         }
       ]
     },
+    "publish": {
+      "provider": "github",
+      "owner": "rafaelsmelll0",
+      "repo": "catalogu",
+      "private": false
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": true,
@@ -80,6 +86,8 @@
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "dotenv": "^17.4.2",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0",

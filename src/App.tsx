@@ -6,6 +6,7 @@ import { SeriesPage } from './pages/SeriesPage.tsx'
 import { StatsPage } from './pages/StatsPage.tsx'
 import { ListasPage } from './pages/ListasPage.tsx'
 import { ToastContainer } from './components/Toast.tsx'
+import { UpdateNotification } from './components/UpdateNotification.tsx'
 import { UIPlaygroundPage } from './pages/UIPlaygroundPage.tsx'
 import { ConfigPage } from './pages/ConfigPage.tsx'
 import { ProximosPage } from './pages/ProximosPage.tsx'
@@ -26,6 +27,7 @@ function App() {
         </Route>
       </Routes>
       <ToastContainer />
+      <UpdateNotification />
     </>
   )
 }
