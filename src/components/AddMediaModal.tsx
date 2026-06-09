@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
+import { useWatchlistStore } from '../store/watchlistStore.ts'
 import {
   Modal, Button, Input, Textarea, Select, Badge, RatingSlider,
   type SelectOption,
@@ -59,10 +60,12 @@ const TIPO_OPTIONS: SelectOption<TipoMidia>[] = [
 
 interface Props {
   onClose: () => void
+  mode?:   'catalog' | 'watchlist'
 }
 
-export function AddMediaModal({ onClose }: Props) {
-  const { addMedia } = useMediaStore()
+export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
+  const { addMedia }   = useMediaStore()
+  const { addItem }    = useWatchlistStore()
   const [step, setStep]           = useState<Step>('tipo')
   const [tipo, setTipo]           = useState<TipoMidia>('filme')
   const [query, setQuery]         = useState('')
@@ -148,23 +151,39 @@ export function AddMediaModal({ onClose }: Props) {
     setSaving(true)
     setError(null)
     try {
-      await addMedia({
-        title:          form.title,
-        release_year:   form.release_year || undefined,
-        synopsis:       form.synopsis || undefined,
-        observations:   form.observations || undefined,
-        rating:         form.rating > 0 ? form.rating : undefined,
-        duration:       form.duration ? Number(form.duration) : undefined,
-        watched:        form.watched ? Number(form.watched) : undefined,
-        cover_path:     form.cover_path || undefined,
-        backdrop_path:  form.backdrop_path || undefined,
-        tipo:           form.tipo,
-        watched_status: form.watched_status,
-        genres:         form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
-        director:       form.director || undefined,
-        cast:           form.cast ? form.cast.split(',').map(c => c.trim()).filter(Boolean) : [],
-        tmdb_id:        form.tmdb_id ?? undefined,
-      })
+      if (mode === 'watchlist') {
+        await addItem({
+          title:         form.title,
+          tipo:          form.tipo,
+          release_year:  form.release_year  || undefined,
+          synopsis:      form.synopsis      || undefined,
+          cover_path:    form.cover_path    || undefined,
+          backdrop_path: form.backdrop_path || undefined,
+          duration:      form.duration ? Number(form.duration) : undefined,
+          director:      form.director      || undefined,
+          genres:        form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
+          cast:          form.cast   ? form.cast.split(',').map(c => c.trim()).filter(Boolean)   : [],
+          tmdb_id:       form.tmdb_id ?? undefined,
+        })
+      } else {
+        await addMedia({
+          title:          form.title,
+          release_year:   form.release_year  || undefined,
+          synopsis:       form.synopsis      || undefined,
+          observations:   form.observations  || undefined,
+          rating:         form.rating > 0 ? form.rating : undefined,
+          duration:       form.duration ? Number(form.duration) : undefined,
+          watched:        form.watched  ? Number(form.watched)  : undefined,
+          cover_path:     form.cover_path    || undefined,
+          backdrop_path:  form.backdrop_path || undefined,
+          tipo:           form.tipo,
+          watched_status: form.watched_status,
+          genres:         form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
+          director:       form.director      || undefined,
+          cast:           form.cast   ? form.cast.split(',').map(c => c.trim()).filter(Boolean)   : [],
+          tmdb_id:        form.tmdb_id ?? undefined,
+        })
+      }
       onClose()
     } catch {
       setError('Erro ao salvar.')
@@ -174,7 +193,7 @@ export function AddMediaModal({ onClose }: Props) {
   }
 
   const titleByStep: Record<Step, string> = {
-    tipo:    'Adicionar Mídia',
+    tipo:    mode === 'watchlist' ? 'Adicionar a Próximos' : 'Adicionar Mídia',
     busca:   `Buscar ${tipo}`,
     selecao: 'Selecionar resultado',
     form:    form.title || 'Preencher dados',
@@ -379,7 +398,7 @@ export function AddMediaModal({ onClose }: Props) {
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md }}>
+              <div style={{ display: 'grid', gridTemplateColumns: mode === 'watchlist' ? '1fr' : '1fr 1fr', gap: theme.spacing.md }}>
                 <Select<TipoMidia>
                   label="Tipo"
                   options={TIPO_OPTIONS}
@@ -387,13 +406,15 @@ export function AddMediaModal({ onClose }: Props) {
                   onChange={v => setForm(f => ({ ...f, tipo: v }))}
                   fullWidth
                 />
-                <Select<Status>
-                  label="Status"
-                  options={STATUS_OPTIONS}
-                  value={form.watched_status}
-                  onChange={v => setForm(f => ({ ...f, watched_status: v }))}
-                  fullWidth
-                />
+                {mode !== 'watchlist' && (
+                  <Select<Status>
+                    label="Status"
+                    options={STATUS_OPTIONS}
+                    value={form.watched_status}
+                    onChange={v => setForm(f => ({ ...f, watched_status: v }))}
+                    fullWidth
+                  />
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md }}>
@@ -410,10 +431,12 @@ export function AddMediaModal({ onClose }: Props) {
                 />
               </div>
 
-              <RatingSlider
-                value={form.rating}
-                onChange={v => setForm(f => ({ ...f, rating: v }))}
-              />
+              {mode !== 'watchlist' && (
+                <RatingSlider
+                  value={form.rating}
+                  onChange={v => setForm(f => ({ ...f, rating: v }))}
+                />
+              )}
 
               <Input
                 label="Gêneros (separados por vírgula)"
@@ -441,12 +464,14 @@ export function AddMediaModal({ onClose }: Props) {
                 rows={3}
               />
 
-              <Textarea
-                label="Observações pessoais"
-                value={form.observations}
-                onChange={e => setForm(f => ({ ...f, observations: e.target.value }))}
-                rows={2}
-              />
+              {mode !== 'watchlist' && (
+                <Textarea
+                  label="Observações pessoais"
+                  value={form.observations}
+                  onChange={e => setForm(f => ({ ...f, observations: e.target.value }))}
+                  rows={2}
+                />
+              )}
 
               <Input
                 label="URL do poster"
@@ -465,7 +490,7 @@ export function AddMediaModal({ onClose }: Props) {
                 ← Voltar
               </Button>
               <Button onClick={handleSave} loading={saving} size="lg">
-                Salvar
+                {mode === 'watchlist' ? 'Adicionar a Próximos' : 'Salvar'}
               </Button>
             </div>
           </div>

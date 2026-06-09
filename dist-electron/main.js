@@ -8,6 +8,7 @@ const path_1 = __importDefault(require("path"));
 const database_js_1 = require("./database.js");
 const queries_js_1 = require("./queries.js");
 const tmdb_js_1 = require("./tmdb.js");
+const watchlistQueries_js_1 = require("./watchlistQueries.js");
 const import_js_1 = require("./import.js");
 const updateBackdrops_js_1 = require("./updateBackdrops.js");
 const isDev = process.env.NODE_ENV === 'development';
@@ -48,6 +49,20 @@ function registerIpcHandlers() {
             event.sender.send('backup:progress', progress);
         });
     });
+    // Watchlist
+    electron_1.ipcMain.handle('watchlist:getAll', () => (0, watchlistQueries_js_1.getAllWatchlist)());
+    electron_1.ipcMain.handle('watchlist:add', (_e, input) => {
+        try {
+            return { success: true, id: (0, watchlistQueries_js_1.addToWatchlist)(input) };
+        }
+        catch (err) {
+            if (String(err).includes('DUPLICATE'))
+                return { success: false, error: 'duplicate' };
+            throw err;
+        }
+    });
+    electron_1.ipcMain.handle('watchlist:remove', (_e, id) => (0, watchlistQueries_js_1.removeFromWatchlist)(id));
+    electron_1.ipcMain.handle('watchlist:count', () => (0, watchlistQueries_js_1.getWatchlistCount)());
     electron_1.ipcMain.handle('backdrop:updateAll', async (event) => {
         return (0, updateBackdrops_js_1.updateAllBackdrops)((progress) => {
             event.sender.send('backdrop:progress', progress);

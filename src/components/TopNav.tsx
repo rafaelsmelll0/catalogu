@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: 'Filmes',       path: '/filmes' },
   { label: 'Séries',       path: '/series' },
   { label: 'Listas',       path: '/listas' },
+  { label: 'Próximos',     path: '/proximos' },
   { label: 'Estatísticas', path: '/stats' },
   { label: 'Configurações', path: '/config' },
 ]

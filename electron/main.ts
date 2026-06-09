@@ -9,6 +9,10 @@ import {
   getMediaInList, addMediaToList, removeMediaFromList,
 } from './queries.js'
 import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
+import {
+  getAllWatchlist, addToWatchlist, removeFromWatchlist, getWatchlistCount,
+  type AddWatchlistInput,
+} from './watchlistQueries.js'
 import { importFromV2Db, type ImportProgress } from './import.js'
 import { updateAllBackdrops, type BackdropUpdateProgress } from './updateBackdrops.js'
 
@@ -52,6 +56,19 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
       event.sender.send('backup:progress', progress)
     })
   })
+
+  // Watchlist
+  ipcMain.handle('watchlist:getAll', () => getAllWatchlist())
+  ipcMain.handle('watchlist:add',    (_e, input: AddWatchlistInput) => {
+    try {
+      return { success: true, id: addToWatchlist(input) }
+    } catch (err) {
+      if (String(err).includes('DUPLICATE')) return { success: false, error: 'duplicate' }
+      throw err
+    }
+  })
+  ipcMain.handle('watchlist:remove', (_e, id: number) => removeFromWatchlist(id))
+  ipcMain.handle('watchlist:count',  ()               => getWatchlistCount())
 
   ipcMain.handle('backdrop:updateAll', async (event) => {
     return updateAllBackdrops((progress: BackdropUpdateProgress) => {

@@ -162,6 +162,12 @@ export function StatsPage() {
           <AnimatedRating value={stats.mediaRating} />
           <span style={labelStyle}>Nota Média</span>
         </div>
+        {stats.proximos > 0 && (
+          <div style={cardStyle}>
+            <AnimatedNum value={stats.proximos} color={theme.colors.warning} />
+            <span style={labelStyle}>Próximos</span>
+          </div>
+        )}
       </div>
 
       {/* Gráficos principais */}

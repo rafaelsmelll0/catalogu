@@ -4,6 +4,7 @@ import { theme } from '../styles/theme.ts'
 import CatSit from '../assets/cat-sit.svg?react'
 import type { Media } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
+import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { HeroBanner } from '../components/HeroBanner.tsx'
 import { LazyMediaRow } from '../components/LazyMediaRow.tsx'
 import { MediaGridSkeleton } from '../components/MediaGridSkeleton.tsx'
@@ -43,11 +44,12 @@ interface RowDef { title: string; items: Media[] }
 const ROW_LIMIT = 12
 
 export function HomePage() {
-  const { items, loading, fetchAll } = useMediaStore()
+  const { items, loading, fetchAll }                      = useMediaStore()
+  const { items: watchlistItems, fetchAll: fetchWatchlist } = useWatchlistStore()
   const navigate = useNavigate()
   const [selected, setSelected] = useState<Media | null>(null)
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchAll(); fetchWatchlist() }, [])
 
   const rows: RowDef[] = useMemo(() => {
     if (items.length === 0) return []
@@ -85,9 +87,11 @@ export function HomePage() {
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
 
     const naoAssistidos = items.filter(m => m.watched_status === 'nao_assistido')
+    const proximos      = watchlistItems.slice(0, ROW_LIMIT)
 
     return [
       { title: 'Adicionados Recentemente',          items: recentes.slice(0, ROW_LIMIT)               },
+      { title: '🎬 Próximos',                        items: proximos as unknown as Media[]             },
       { title: '⭐ Os Melhores',                     items: melhores.slice(0, ROW_LIMIT)               },
       { title: '🎃 Terror',                          items: pickRandomSample(terror, ROW_LIMIT)        },
       { title: '🔪 Suspense',                        items: pickRandomSample(suspense, ROW_LIMIT)      },
@@ -101,7 +105,7 @@ export function HomePage() {
       { title: '🍿 Maratona (2h30+)',                items: maratona.slice(0, ROW_LIMIT)               },
       { title: '🔍 Não Assistidos',                  items: pickRandomSample(naoAssistidos, ROW_LIMIT) },
     ].filter(row => row.items.length > 0)
-  }, [items])
+  }, [items, watchlistItems])
 
   if (loading) {
     return (

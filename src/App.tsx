@@ -8,6 +8,7 @@ import { ListasPage } from './pages/ListasPage.tsx'
 import { ToastContainer } from './components/Toast.tsx'
 import { UIPlaygroundPage } from './pages/UIPlaygroundPage.tsx'
 import { ConfigPage } from './pages/ConfigPage.tsx'
+import { ProximosPage } from './pages/ProximosPage.tsx'
 
 function App() {
   return (
@@ -18,7 +19,8 @@ function App() {
           <Route path="filmes" element={<FilmesPage />} />
           <Route path="series" element={<SeriesPage />} />
           <Route path="stats"  element={<StatsPage />} />
-          <Route path="listas" element={<ListasPage />} />
+          <Route path="listas"    element={<ListasPage />} />
+          <Route path="proximos"  element={<ProximosPage />} />
           <Route path="ui"     element={<UIPlaygroundPage />} />
           <Route path="config" element={<ConfigPage />} />
         </Route>

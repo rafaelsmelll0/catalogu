@@ -41,10 +41,27 @@ export interface MediaList {
 }
 
 export interface AppStats {
-  total: number
-  filmes: number
-  series: number
-  assistidos: number
+  total:         number
+  filmes:        number
+  series:        number
+  assistidos:    number
   naoAssistidos: number
-  mediaRating: number
+  mediaRating:   number
+  proximos:      number
+}
+
+export interface WatchlistItem {
+  id:             number
+  title:          string
+  tipo:           'filme' | 'serie'
+  release_year?:  string
+  synopsis?:      string
+  cover_path?:    string
+  backdrop_path?: string
+  duration?:      number
+  director?:      string
+  genres:         string[]
+  cast:           string[]
+  tmdb_id?:       number
+  created_at:     string
 }

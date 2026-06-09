@@ -325,6 +325,11 @@ const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched
   const naoAssistidos = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched_status = 'nao_assistido'").get() as { n: number }).n
   const avgRow        = db.prepare('SELECT AVG(rating) as avg FROM media WHERE rating IS NOT NULL').get() as { avg: number | null }
 
+  let proximos = 0
+  try {
+    proximos = (db.prepare('SELECT COUNT(*) as n FROM watchlist').get() as { n: number }).n
+  } catch { /* tabela pode não existir em bancos antigos */ }
+
   return {
     total,
     filmes,
@@ -332,5 +337,6 @@ const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched
     assistidos,
     naoAssistidos,
     mediaRating: avgRow.avg ? Math.round(avgRow.avg * 10) / 10 : 0,
+    proximos,
   }
 }

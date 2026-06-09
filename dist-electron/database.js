@@ -91,6 +91,22 @@ function initSchema() {
       FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE,
       FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS watchlist (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT NOT NULL,
+      tipo          TEXT NOT NULL CHECK(tipo IN ('filme','serie')),
+      release_year  TEXT,
+      synopsis      TEXT,
+      cover_path    TEXT,
+      backdrop_path TEXT,
+      duration      INTEGER,
+      director      TEXT,
+      genres        TEXT DEFAULT '[]',
+      cast          TEXT DEFAULT '[]',
+      tmdb_id       INTEGER,
+      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
     // Migration: adicionar backdrop_path se não existir
     try {
@@ -98,5 +114,28 @@ function initSchema() {
     }
     catch {
         db.exec('ALTER TABLE media ADD COLUMN backdrop_path TEXT');
+    }
+    // Migration: criar watchlist em bancos antigos
+    try {
+        db.prepare('SELECT id FROM watchlist LIMIT 1').get();
+    }
+    catch {
+        db.exec(`
+      CREATE TABLE IF NOT EXISTS watchlist (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        title         TEXT NOT NULL,
+        tipo          TEXT NOT NULL CHECK(tipo IN ('filme','serie')),
+        release_year  TEXT,
+        synopsis      TEXT,
+        cover_path    TEXT,
+        backdrop_path TEXT,
+        duration      INTEGER,
+        director      TEXT,
+        genres        TEXT DEFAULT '[]',
+        cast          TEXT DEFAULT '[]',
+        tmdb_id       INTEGER,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     }
 }
