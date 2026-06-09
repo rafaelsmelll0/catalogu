@@ -92,6 +92,21 @@ export function removeFromWatchlist(id: number): boolean {
   return true
 }
 
+export function findDuplicateInWatchlist(tmdbId: number | null, title: string, releaseYear?: string): WatchlistRow | null {
+  const db = getDatabase()
+
+  if (tmdbId) {
+    const row = db.prepare('SELECT * FROM watchlist WHERE tmdb_id = ?').get(tmdbId) as WatchlistRowRaw | undefined
+    if (row) return parseRow(row)
+  }
+
+  const row = db.prepare(
+    'SELECT * FROM watchlist WHERE LOWER(title) = LOWER(?) AND release_year = ?'
+  ).get(title, releaseYear ?? '') as WatchlistRowRaw | undefined
+
+  return row ? parseRow(row) : null
+}
+
 export function getWatchlistCount(): number {
   const db = getDatabase()
   return (db.prepare('SELECT COUNT(*) as n FROM watchlist').get() as { n: number }).n

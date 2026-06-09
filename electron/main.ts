@@ -9,10 +9,12 @@ import {
   getAllGenres, getStats,
   getAllLists, createList, updateList, deleteList,
   getMediaInList, addMediaToList, removeMediaFromList,
+  findDuplicateInMedia,
 } from './queries.js'
 import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
 import {
   getAllWatchlist, addToWatchlist, removeFromWatchlist, getWatchlistCount,
+  findDuplicateInWatchlist,
   type AddWatchlistInput,
 } from './watchlistQueries.js'
 import { updateAllImages, type ImageUpdateProgress } from './updateImages.js'
@@ -55,6 +57,14 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   })
   ipcMain.handle('watchlist:remove', (_e, id: number) => removeFromWatchlist(id))
   ipcMain.handle('watchlist:count',  ()               => getWatchlistCount())
+
+  // Verificações de duplicata
+  ipcMain.handle('media:findDuplicate',     (_e, tmdbId: number | null, title: string, releaseYear?: string) =>
+    findDuplicateInMedia(tmdbId, title, releaseYear)
+  )
+  ipcMain.handle('watchlist:findDuplicate', (_e, tmdbId: number | null, title: string, releaseYear?: string) =>
+    findDuplicateInWatchlist(tmdbId, title, releaseYear)
+  )
 
   // Atualizar imagens (capa + backdrop)
   ipcMain.handle('images:updateAll', async (event) => {

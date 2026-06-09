@@ -83,6 +83,9 @@ function registerIpcHandlers() {
     });
     electron_1.ipcMain.handle('watchlist:remove', (_e, id) => (0, watchlistQueries_js_1.removeFromWatchlist)(id));
     electron_1.ipcMain.handle('watchlist:count', () => (0, watchlistQueries_js_1.getWatchlistCount)());
+    // Verificações de duplicata
+    electron_1.ipcMain.handle('media:findDuplicate', (_e, tmdbId, title, releaseYear) => (0, queries_js_1.findDuplicateInMedia)(tmdbId, title, releaseYear));
+    electron_1.ipcMain.handle('watchlist:findDuplicate', (_e, tmdbId, title, releaseYear) => (0, watchlistQueries_js_1.findDuplicateInWatchlist)(tmdbId, title, releaseYear));
     // Atualizar imagens (capa + backdrop)
     electron_1.ipcMain.handle('images:updateAll', async (event) => {
         return (0, updateImages_js_1.updateAllImages)((progress) => {

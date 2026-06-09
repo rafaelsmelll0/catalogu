@@ -41,6 +41,13 @@ export function TopNav() {
     'ctrl+k': () => setShowSearch(true),
     'ctrl+n': () => setShowAdd(true),
     'escape': () => { if (showSearch) handleSearchClose() },
+    'ctrl+1': () => navigate('/'),
+    'ctrl+2': () => navigate('/filmes'),
+    'ctrl+3': () => navigate('/series'),
+    'ctrl+4': () => navigate('/listas'),
+    'ctrl+5': () => navigate('/proximos'),
+    'ctrl+6': () => navigate('/stats'),
+    'ctrl+7': () => navigate('/config'),
   })
 
   return (
@@ -111,7 +118,7 @@ export function TopNav() {
         )}
 
         <div style={{ display: 'flex', gap: theme.spacing.sm, alignItems: 'center', flexShrink: 0 }}>
-          <Tooltip content="Buscar (Ctrl+K)">
+          <Tooltip content="Buscar (Ctrl+K)" side="bottom">
             <Button
               variant="ghost"
               size="sm"
@@ -122,7 +129,7 @@ export function TopNav() {
             </Button>
           </Tooltip>
 
-          <Tooltip content="Adicionar (Ctrl+N)">
+          <Tooltip content="Adicionar (Ctrl+N)" side="bottom">
             <Button size="sm" onClick={() => setShowAdd(true)}>
               + Adicionar
             </Button>

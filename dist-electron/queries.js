@@ -5,6 +5,7 @@ exports.getMediaById = getMediaById;
 exports.addMedia = addMedia;
 exports.updateMedia = updateMedia;
 exports.deleteMedia = deleteMedia;
+exports.findDuplicateInMedia = findDuplicateInMedia;
 exports.getAllTags = getAllTags;
 exports.getAllGenres = getAllGenres;
 exports.getAllLists = getAllLists;
@@ -104,6 +105,16 @@ function deleteMedia(id) {
     const db = (0, database_js_1.getDatabase)();
     db.prepare('DELETE FROM media WHERE id = ?').run(id);
     return true;
+}
+function findDuplicateInMedia(tmdbId, title, releaseYear) {
+    const db = (0, database_js_1.getDatabase)();
+    if (tmdbId) {
+        const row = db.prepare('SELECT * FROM media WHERE tmdb_id = ?').get(tmdbId);
+        if (row)
+            return row;
+    }
+    const row = db.prepare('SELECT * FROM media WHERE LOWER(title) = LOWER(?) AND release_year = ?').get(title, releaseYear ?? '');
+    return row ?? null;
 }
 // -- ASSOCIAÇÕES -------------------------------------------------------------
 function getGenresForMedia(mediaId) {

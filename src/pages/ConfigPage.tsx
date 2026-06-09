@@ -305,6 +305,57 @@ export function ConfigPage() {
         )}
       </div>
 
+      {/* Atalhos de teclado */}
+      <div style={sectionStyle}>
+        <h2 style={{ fontSize: theme.fontSizes.h3, fontWeight: theme.fontWeights.bold, marginBottom: theme.spacing.md }}>
+          Atalhos de teclado
+        </h2>
+
+        {[
+          { keys: ['Ctrl', 'K'],      desc: 'Abrir busca' },
+          { keys: ['Ctrl', 'N'],      desc: 'Adicionar mídia' },
+          { keys: ['Esc'],            desc: 'Fechar modal / Fechar busca' },
+          { keys: ['Ctrl', '1'],      desc: 'Ir para Início' },
+          { keys: ['Ctrl', '2'],      desc: 'Ir para Filmes' },
+          { keys: ['Ctrl', '3'],      desc: 'Ir para Séries' },
+          { keys: ['Ctrl', '4'],      desc: 'Ir para Listas' },
+          { keys: ['Ctrl', '5'],      desc: 'Ir para Próximos' },
+          { keys: ['Ctrl', '6'],      desc: 'Ir para Estatísticas' },
+          { keys: ['Ctrl', '7'],      desc: 'Ir para Configurações' },
+        ].map(({ keys, desc }) => (
+          <div key={desc} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: `${theme.spacing.sm} 0`,
+            borderBottom: `1px solid ${theme.colors.surfaceElevated}`,
+          }}>
+            <span style={{ fontSize: theme.fontSizes.ui, color: theme.colors.textSecondary }}>
+              {desc}
+            </span>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {keys.map((k, i) => (
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <kbd style={{
+                    background: theme.colors.surfaceElevated,
+                    border: `1px solid ${theme.colors.surfaceHover}`,
+                    borderRadius: theme.radius.sm,
+                    padding: '2px 8px',
+                    fontSize: theme.fontSizes.small,
+                    fontFamily: theme.fonts.mono,
+                    color: theme.colors.textPrimary,
+                    boxShadow: `0 2px 0 ${theme.colors.surfaceHover}`,
+                  }}>
+                    {k}
+                  </kbd>
+                  {i < keys.length - 1 && (
+                    <span style={{ fontSize: theme.fontSizes.tiny, color: theme.colors.textMuted }}>+</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Modal: Mesclar ou Substituir */}
       <Modal
         open={!!pendingDbPath && !importing}

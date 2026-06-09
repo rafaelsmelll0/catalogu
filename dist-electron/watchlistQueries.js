@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllWatchlist = getAllWatchlist;
 exports.addToWatchlist = addToWatchlist;
 exports.removeFromWatchlist = removeFromWatchlist;
+exports.findDuplicateInWatchlist = findDuplicateInWatchlist;
 exports.getWatchlistCount = getWatchlistCount;
 const database_js_1 = require("./database.js");
 function parseRow(row) {
@@ -54,6 +55,16 @@ function removeFromWatchlist(id) {
     const db = (0, database_js_1.getDatabase)();
     db.prepare('DELETE FROM watchlist WHERE id = ?').run(id);
     return true;
+}
+function findDuplicateInWatchlist(tmdbId, title, releaseYear) {
+    const db = (0, database_js_1.getDatabase)();
+    if (tmdbId) {
+        const row = db.prepare('SELECT * FROM watchlist WHERE tmdb_id = ?').get(tmdbId);
+        if (row)
+            return parseRow(row);
+    }
+    const row = db.prepare('SELECT * FROM watchlist WHERE LOWER(title) = LOWER(?) AND release_year = ?').get(title, releaseYear ?? '');
+    return row ? parseRow(row) : null;
 }
 function getWatchlistCount() {
     const db = (0, database_js_1.getDatabase)();

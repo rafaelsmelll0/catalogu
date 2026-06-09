@@ -145,6 +145,21 @@ export function deleteMedia(id: number): boolean {
   return true
 }
 
+export function findDuplicateInMedia(tmdbId: number | null, title: string, releaseYear?: string): MediaRow | null {
+  const db = getDatabase()
+
+  if (tmdbId) {
+    const row = db.prepare('SELECT * FROM media WHERE tmdb_id = ?').get(tmdbId) as MediaRow | undefined
+    if (row) return row
+  }
+
+  const row = db.prepare(
+    'SELECT * FROM media WHERE LOWER(title) = LOWER(?) AND release_year = ?'
+  ).get(title, releaseYear ?? '') as MediaRow | undefined
+
+  return row ?? null
+}
+
 // -- ASSOCIAÇÕES -------------------------------------------------------------
 
 function getGenresForMedia(mediaId: number): string[] {
