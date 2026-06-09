@@ -29,8 +29,6 @@ export function MediaRow({ title, items, onCardClick }: Props) {
         padding: `${theme.spacing.sm} ${theme.layout.pagePadding} ${theme.spacing.lg}`,
         overflowX: 'auto',
         overflowY: 'hidden',
-        scrollbarWidth: 'thin',
-        scrollbarColor: `${theme.colors.surfaceHover} transparent`,
       }}>
         {items.map((media, i) => (
           <MovieCard key={media.id} media={media} onClick={onCardClick} index={i} />

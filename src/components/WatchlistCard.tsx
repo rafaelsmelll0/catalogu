@@ -113,7 +113,7 @@ function WatchlistCardInner({ item, onWatched, onRemove, index = 0 }: Props) {
             color: theme.colors.textSecondary,
             lineHeight: 1.6,
             display: '-webkit-box',
-            WebkitLineClamp: 3,
+            WebkitLineClamp: 5,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             margin: 0,
