@@ -1,29 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { theme } from '../styles/theme.ts'
 import type { WatchlistItem } from '../types/index.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { WatchlistCard } from '../components/WatchlistCard.tsx'
 import { MarkAsWatchedModal } from '../components/MarkAsWatchedModal.tsx'
 import { AddMediaModal } from '../components/AddMediaModal.tsx'
-import { Modal, Button, Input } from '../components/ui/index.ts'
+import { Modal, Button } from '../components/ui/index.ts'
+import {
+  WatchlistFilterBar,
+  DEFAULT_WATCHLIST_FILTERS,
+  applyWatchlistFilters,
+  type WatchlistFilters,
+} from '../components/WatchlistFilterBar.tsx'
 import Roll from '../assets/roll.svg?react'
 
 export function ProximosPage() {
   const { items, loading, fetchAll, removeItem } = useWatchlistStore()
-  const [showAdd, setShowAdd]     = useState(false)
-  const [toWatch, setToWatch]     = useState<WatchlistItem | null>(null)
-  const [toRemove, setToRemove]   = useState<WatchlistItem | null>(null)
-  const [search, setSearch]       = useState('')
+  const [showAdd, setShowAdd]       = useState(false)
+  const [toWatch, setToWatch]       = useState<WatchlistItem | null>(null)
+  const [toRemove, setToRemove]     = useState<WatchlistItem | null>(null)
+  const [filters, setFiltersState]  = useState<WatchlistFilters>(DEFAULT_WATCHLIST_FILTERS)
 
   useEffect(() => { fetchAll() }, [])
 
-  const filtered = search.trim()
-    ? items.filter(m =>
-        m.title.toLowerCase().includes(search.toLowerCase()) ||
-        (m.release_year ?? '').includes(search) ||
-        (m.director ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : items
+  function setFilters(f: Partial<WatchlistFilters>) {
+    setFiltersState(prev => ({ ...prev, ...f }))
+  }
+
+  function resetFilters() {
+    setFiltersState(DEFAULT_WATCHLIST_FILTERS)
+  }
+
+  const filtered = useMemo(
+    () => applyWatchlistFilters(items, filters),
+    [items, filters]
+  )
 
   return (
     <div style={{ background: theme.colors.bg, minHeight: '100vh', padding: `${theme.spacing.xl} ${theme.layout.pagePadding}` }}>
@@ -32,7 +43,7 @@ export function ProximosPage() {
       <div style={{
         display: 'flex', alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: theme.spacing.xl,
+        marginBottom: theme.spacing.lg,
         flexWrap: 'wrap', gap: theme.spacing.md,
       }}>
         <div>
@@ -51,16 +62,15 @@ export function ProximosPage() {
         <Button onClick={() => setShowAdd(true)}>+ Adicionar</Button>
       </div>
 
-      {/* Busca */}
+      {/* Filtros — só aparece se tiver itens */}
       {items.length > 0 && (
-        <div style={{ marginBottom: theme.spacing.lg, maxWidth: '400px' }}>
-          <Input
-            icon="⌕"
-            placeholder="Buscar na fila..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+        <WatchlistFilterBar
+          filters={filters}
+          setFilters={setFilters}
+          resetFilters={resetFilters}
+          allItems={items}
+          filtered={filtered}
+        />
       )}
 
       {/* Conteúdo */}
@@ -82,13 +92,22 @@ export function ProximosPage() {
           </p>
           <Button onClick={() => setShowAdd(true)}>+ Adicionar o primeiro</Button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '30vh', gap: theme.spacing.md,
+          animation: 'pageIn 0.4s ease-out',
+        }}>
+          <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
+            Nenhum resultado para os filtros aplicados
+          </p>
+          <Button variant="ghost" size="sm" onClick={resetFilters}>
+            × Limpar filtros
+          </Button>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
-          {filtered.length === 0 ? (
-            <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
-              Nenhum resultado para "{search}"
-            </p>
-          ) : filtered.map((item, i) => (
+          {filtered.map((item, i) => (
             <WatchlistCard
               key={item.id}
               item={item}
@@ -100,7 +119,7 @@ export function ProximosPage() {
         </div>
       )}
 
-      {/* Modal: Adicionar à watchlist */}
+      {/* Modal: Adicionar */}
       {showAdd && (
         <AddMediaModal
           mode="watchlist"
