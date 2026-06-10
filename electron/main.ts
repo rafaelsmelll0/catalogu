@@ -9,6 +9,7 @@ import {
   getAllGenres, getStats,
   getAllLists, createList, updateList, deleteList,
   getMediaInList, addMediaToList, removeMediaFromList,
+  addWatchlistItemToList, removeWatchlistItemFromList,
   findDuplicateInMedia,
 } from './queries.js'
 import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
@@ -43,7 +44,9 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   ipcMain.handle('lists:delete',      (_e, id: number) => deleteList(id))
   ipcMain.handle('lists:getMedia',    (_e, listId: number) => getMediaInList(listId))
   ipcMain.handle('lists:addMedia',    (_e, mediaId: number, listId: number) => addMediaToList(mediaId, listId))
-  ipcMain.handle('lists:removeMedia', (_e, mediaId: number, listId: number) => removeMediaFromList(mediaId, listId))
+  ipcMain.handle('lists:removeMedia',          (_e, mediaId: number, listId: number)     => removeMediaFromList(mediaId, listId))
+  ipcMain.handle('lists:addWatchlistItem',    (_e, watchlistId: number, listId: number) => addWatchlistItemToList(watchlistId, listId))
+  ipcMain.handle('lists:removeWatchlistItem', (_e, watchlistId: number, listId: number) => removeWatchlistItemFromList(watchlistId, listId))
 
   // Watchlist
   ipcMain.handle('watchlist:getAll', () => getAllWatchlist())

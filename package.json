@@ -52,6 +52,7 @@
       "icon": "src/assets/catalogu.ico",
       "requestedExecutionLevel": "requireAdministrator",
       "signAndEditExecutable": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "target": [
         {
           "target": "nsis",

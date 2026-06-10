@@ -23,7 +23,7 @@ const POSTER_GRADIENTS = [
 function MovieCardInner({ media, onClick, index = 0 }: Props) {
   const [hovered, setHovered] = useState(false)
 
-  const isUnseen   = media.watched_status === 'nao_assistido' || media.watched_status === 'nao_lembro'
+  const isUnseen   = (media.watched_status === 'nao_assistido' || media.watched_status === 'nao_lembro') && !(media as any).isProximo
   const isWatching = media.watched_status === 'assistindo'
   const gradient   = POSTER_GRADIENTS[media.id % POSTER_GRADIENTS.length]
 
@@ -107,7 +107,11 @@ function MovieCardInner({ media, onClick, index = 0 }: Props) {
             top: theme.spacing.xs,
             right: theme.spacing.xs,
             zIndex: 2,
+            display: 'flex', flexDirection: 'row', gap: '3px', alignItems: 'center',
           }}>
+            {(media as any).isProximo && (
+              <Badge size="sm" variant="warning">PRÓXIMO</Badge>
+            )}
             <Badge size="sm" customColor={theme.colors.typeColors[media.tipo]}>
               {media.tipo}
             </Badge>

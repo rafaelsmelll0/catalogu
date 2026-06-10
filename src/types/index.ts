@@ -22,6 +22,8 @@ export interface Media {
   tags?: string[]
   cast?: string[]
   director?: string
+  isProximo?:   boolean
+  watchlistId?: number
 }
 
 export interface Genre {
@@ -64,4 +66,22 @@ export interface WatchlistItem {
   cast:           string[]
   tmdb_id?:       number
   created_at:     string
+}
+
+export interface ListCandidate {
+  id:              number
+  title:           string
+  tipo:            'filme' | 'serie'
+  release_year?:   string
+  synopsis?:       string
+  cover_path?:     string
+  duration?:       number
+  director?:       string
+  genres?:         string[]
+  rating?:         number
+  observations?:   string
+  tmdb_id?:        number
+  isProximo:       boolean
+  sourceId:        number
+  watched_status?: string
 }

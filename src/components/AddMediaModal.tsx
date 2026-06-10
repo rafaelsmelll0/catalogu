@@ -92,6 +92,13 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
   const [conflict, setConflict]   = useState<ConflictState | null>(null)
   const [moveItem, setMoveItem]   = useState<WatchlistItem | null>(null)
 
+  // Multi-select (só modo watchlist)
+  const [multiMode, setMultiMode]       = useState(false)
+  const [selected, setSelected]         = useState<Set<number>>(new Set())
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; title: string } | null>(null)
+  const [bulkDone, setBulkDone]         = useState(false)
+  const [bulkLog, setBulkLog]           = useState<{ title: string; status: 'added' | 'dup_watchlist' | 'dup_catalog' | 'error' }[]>([])
+
   async function handleSearch() {
     if (!query.trim()) return
     setSearching(true)
@@ -239,6 +246,73 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
     onClose()
   }
 
+  async function handleBulkAdd() {
+    if (selected.size === 0) return
+    const toAdd = results.filter(r => selected.has(r.id))
+    setBulkProgress({ current: 0, total: toAdd.length, title: '' })
+    setBulkLog([])
+
+    let added = 0
+    for (const r of toAdd) {
+      setBulkProgress({ current: added, total: toAdd.length, title: r.title })
+      try {
+        const channel = tipo === 'filme' ? 'tmdb:movieDetails' : 'tmdb:tvDetails'
+        const details = await window.electronAPI.invoke(channel, r.id) as {
+          id: number; title?: string; name?: string; overview: string
+          release_date?: string; first_air_date?: string
+          runtime?: number; number_of_episodes?: number
+          genres: { name: string }[]
+          poster_path: string | null
+          backdrop_path: string | null
+          credits: { cast: { name: string }[]; crew: { name: string; job: string }[] }
+        }
+
+        const tmdbId      = details.id
+        const title       = details.title ?? details.name ?? ''
+        const releaseYear = (details.release_date ?? details.first_air_date ?? '').slice(0, 4) || undefined
+        const inWatchlist = await window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear)
+        const inCatalog   = await window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear)
+
+        if (inWatchlist) {
+          setBulkLog(prev => [...prev, { title, status: 'dup_watchlist' }])
+          added++; continue
+        }
+        if (inCatalog) {
+          setBulkLog(prev => [...prev, { title, status: 'dup_catalog' }])
+          added++; continue
+        }
+
+        const posterUrl   = details.poster_path   ? await window.electronAPI.invoke('tmdb:posterUrl', details.poster_path)     as string : ''
+        const backdropUrl = details.backdrop_path ? await window.electronAPI.invoke('tmdb:backdropUrl', details.backdrop_path) as string : ''
+        const director    = details.credits?.crew?.find((c: { job: string }) => c.job === 'Director')?.name ?? ''
+        const cast        = (details.credits?.cast ?? []).slice(0, 5).map((c: { name: string }) => c.name)
+        const genres      = (details.genres ?? []).map((g: { name: string }) => g.name)
+
+        await addItem({
+          title, tipo,
+          release_year:  releaseYear,
+          synopsis:      details.overview || undefined,
+          cover_path:    posterUrl   || undefined,
+          backdrop_path: backdropUrl || undefined,
+          duration:      details.runtime ?? details.number_of_episodes ?? undefined,
+          director:      director    || undefined,
+          genres, cast,
+          tmdb_id: details.id,
+        })
+        setBulkLog(prev => [...prev, { title, status: 'added' }])
+      } catch {
+        setBulkLog(prev => [...prev, { title: r.title, status: 'error' }])
+      }
+
+      added++
+      setBulkProgress({ current: added, total: toAdd.length, title: r.title })
+      await new Promise(res => setTimeout(res, 150))
+    }
+
+    setBulkProgress({ current: toAdd.length, total: toAdd.length, title: '' })
+    setBulkDone(true)
+  }
+
   const titleByStep: Record<Step, string> = {
     tipo:    mode === 'watchlist' ? 'Adicionar a Próximos' : 'Adicionar Mídia',
     busca:   `Buscar ${tipo}`,
@@ -373,58 +447,195 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
           {/* STEP: SELEÇÃO */}
           {step === 'selecao' && (
             <div>
-              <p style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: theme.fontSizes.ui }}>
-                {results.length} resultado(s) para "{query}". Selecione:
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
-                {results.map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => handleSelect(r)}
-                    disabled={searching}
-                    className="focus-ring"
-                    style={{
-                      background: theme.colors.surface,
-                      border: `1px solid ${theme.colors.surfaceHover}`,
-                      borderRadius: theme.radius.md,
-                      color: theme.colors.textPrimary,
-                      cursor: searching ? 'wait' : 'pointer',
-                      padding: theme.spacing.sm,
-                      textAlign: 'left',
-                      display: 'flex', gap: theme.spacing.sm,
-                      transition: `all ${theme.transitions.fast}`,
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = theme.colors.primary
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = theme.colors.surfaceHover
-                      e.currentTarget.style.background = theme.colors.surface
-                    }}
-                  >
-                    {r.posterUrl && (
-                      <img src={r.posterUrl} alt={r.title}
-                        style={{ width: '56px', height: '84px', objectFit: 'cover', borderRadius: theme.radius.sm, flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.ui, marginBottom: '4px' }}>
-                        {r.title} {r.year && <span style={{ color: theme.colors.textMuted, fontWeight: 400 }}>({r.year})</span>}
-                      </div>
-                      <div style={{
-                        color: theme.colors.textSecondary, fontSize: theme.fontSizes.small,
-                        lineHeight: 1.4, display: '-webkit-box',
-                        WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                      }}>
-                        {r.overview || 'Sem sinopse.'}
-                      </div>
+              {/* Barra de progresso do bulk add */}
+              {bulkProgress && (
+                <div style={{
+                  marginBottom: theme.spacing.md,
+                  padding: theme.spacing.md,
+                  background: theme.colors.surface,
+                  borderRadius: theme.radius.md,
+                  border: `1px solid ${theme.colors.surfaceElevated}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing.xs }}>
+                    <span style={{ fontSize: theme.fontSizes.ui, color: theme.colors.textSecondary }}>
+                      {bulkDone ? 'Concluído!' : bulkProgress.title || 'Aguarde...'}
+                    </span>
+                    <span style={{ fontSize: theme.fontSizes.ui, fontWeight: theme.fontWeights.bold, color: theme.colors.primary }}>
+                      {bulkProgress.current}/{bulkProgress.total}
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', background: theme.colors.surfaceElevated, borderRadius: theme.radius.full, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', background: theme.colors.primary,
+                      borderRadius: theme.radius.full,
+                      width: `${Math.round((bulkProgress.current / bulkProgress.total) * 100)}%`,
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                  {/* Log de resultados */}
+                  {bulkLog.length > 0 && (
+                    <div style={{
+                      marginTop: theme.spacing.sm,
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      display: 'flex', flexDirection: 'column', gap: '3px',
+                    }}>
+                      {bulkLog.map((entry, i) => {
+                        const color =
+                          entry.status === 'added'         ? theme.colors.success :
+                          entry.status === 'dup_watchlist' ? theme.colors.warning :
+                          entry.status === 'dup_catalog'   ? theme.colors.warning :
+                                                             theme.colors.danger
+                        const label =
+                          entry.status === 'added'         ? '✓ Adicionado' :
+                          entry.status === 'dup_watchlist' ? '⚠ Já está em Próximos' :
+                          entry.status === 'dup_catalog'   ? '⚠ Já está no catálogo' :
+                                                             '✗ Erro'
+                        return (
+                          <div key={i} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            fontSize: theme.fontSizes.tiny, padding: '2px 0',
+                            borderBottom: `1px solid ${theme.colors.surfaceElevated}`,
+                          }}>
+                            <span style={{ color: theme.colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                              {entry.title}
+                            </span>
+                            <span style={{ color, flexShrink: 0, marginLeft: theme.spacing.sm, fontWeight: theme.fontWeights.bold }}>
+                              {label}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  </button>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep('busca')} style={{ marginTop: theme.spacing.md }}>
-                ← Voltar à busca
-              </Button>
+                  )}
+
+                  {bulkDone && (
+                    <div style={{ marginTop: theme.spacing.sm, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button size="sm" onClick={onClose}>Fechar</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!bulkProgress && (
+                <>
+                  {/* Header com contador e botão multi-select */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
+                    <p style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.ui }}>
+                      {results.length} resultado(s) para "{query}".{' '}
+                      {multiMode && selected.size > 0 && (
+                        <span style={{ color: theme.colors.primary, fontWeight: theme.fontWeights.bold }}>
+                          {selected.size} selecionado(s)
+                        </span>
+                      )}
+                    </p>
+                    {mode === 'watchlist' && (
+                      <Button
+                        variant={multiMode ? 'primary' : 'secondary'}
+                        size="sm"
+                        onClick={() => { setMultiMode(m => !m); setSelected(new Set()) }}
+                      >
+                        {multiMode ? '✕ Cancelar seleção' : '☑ Selecionar vários'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Lista de resultados */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
+                    {results.map(r => {
+                      const isSelected = selected.has(r.id)
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => {
+                            if (multiMode) {
+                              setSelected(prev => {
+                                const next = new Set(prev)
+                                if (next.has(r.id)) next.delete(r.id)
+                                else next.add(r.id)
+                                return next
+                              })
+                            } else {
+                              handleSelect(r)
+                            }
+                          }}
+                          disabled={searching}
+                          className="focus-ring"
+                          style={{
+                            background: isSelected ? theme.colors.primaryGlow : theme.colors.surface,
+                            border: `1px solid ${isSelected ? theme.colors.primary : theme.colors.surfaceHover}`,
+                            borderRadius: theme.radius.md,
+                            color: theme.colors.textPrimary,
+                            cursor: searching ? 'wait' : 'pointer',
+                            padding: theme.spacing.sm,
+                            textAlign: 'left',
+                            display: 'flex', gap: theme.spacing.sm, alignItems: 'center',
+                            transition: `all ${theme.transitions.fast}`,
+                          }}
+                          onMouseEnter={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = theme.colors.primary
+                              e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = theme.colors.surfaceHover
+                              e.currentTarget.style.background = theme.colors.surface
+                            }
+                          }}
+                        >
+                          {/* Checkbox visual no modo multi */}
+                          {multiMode && (
+                            <div style={{
+                              width: '18px', height: '18px', flexShrink: 0,
+                              borderRadius: '4px',
+                              border: `2px solid ${isSelected ? theme.colors.primary : theme.colors.surfaceHover}`,
+                              background: isSelected ? theme.colors.primary : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: `all ${theme.transitions.fast}`,
+                            }}>
+                              {isSelected && <span style={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}>✓</span>}
+                            </div>
+                          )}
+
+                          {r.posterUrl && (
+                            <img src={r.posterUrl} alt={r.title}
+                              style={{ width: '56px', height: '84px', objectFit: 'cover', borderRadius: theme.radius.sm, flexShrink: 0 }} />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.ui, marginBottom: '4px' }}>
+                              {r.title} {r.year && <span style={{ color: theme.colors.textMuted, fontWeight: 400 }}>({r.year})</span>}
+                            </div>
+                            <div style={{
+                              color: theme.colors.textSecondary, fontSize: theme.fontSizes.small,
+                              lineHeight: 1.4, display: '-webkit-box',
+                              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                            }}>
+                              {r.overview || 'Sem sinopse.'}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginTop: theme.spacing.md,
+                  }}>
+                    <Button variant="ghost" size="sm" onClick={() => setStep('busca')}>
+                      ← Voltar à busca
+                    </Button>
+                    {multiMode && selected.size > 0 && (
+                      <Button onClick={handleBulkAdd}>
+                        + Adicionar {selected.size} título{selected.size > 1 ? 's' : ''}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

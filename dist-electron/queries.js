@@ -15,6 +15,8 @@ exports.deleteList = deleteList;
 exports.getMediaInList = getMediaInList;
 exports.addMediaToList = addMediaToList;
 exports.removeMediaFromList = removeMediaFromList;
+exports.addWatchlistItemToList = addWatchlistItemToList;
+exports.removeWatchlistItemFromList = removeWatchlistItemFromList;
 exports.getStats = getStats;
 const database_js_1 = require("./database.js");
 // -- MEDIA -------------------------------------------------------------------
@@ -208,10 +210,11 @@ function getAllGenres() {
 function getAllLists() {
     const db = (0, database_js_1.getDatabase)();
     return db.prepare(`
-    SELECT l.*, COUNT(ml.media_id) as media_count
+    SELECT l.*,
+      (SELECT COUNT(*) FROM media_lists_link ml WHERE ml.list_id = l.id) +
+      (SELECT COUNT(*) FROM watchlist_lists_link wl WHERE wl.list_id = l.id)
+      as media_count
     FROM lists l
-    LEFT JOIN media_lists_link ml ON ml.list_id = l.id
-    GROUP BY l.id
     ORDER BY l.name
   `).all();
 }
@@ -232,19 +235,46 @@ function deleteList(id) {
 }
 function getMediaInList(listId) {
     const db = (0, database_js_1.getDatabase)();
-    const rows = db.prepare(`
+    const mediaRows = db.prepare(`
     SELECT m.* FROM media m
     JOIN media_lists_link ml ON ml.media_id = m.id
     WHERE ml.list_id = ?
     ORDER BY m.title
   `).all(listId);
-    return rows.map(row => ({
+    const catalogItems = mediaRows.map(row => ({
         ...row,
         genres: getGenresForMedia(row.id),
         tags: getTagsForMedia(row.id),
         cast: getCastForMedia(row.id),
         director: getDirectorForMedia(row.id),
+        isProximo: false,
     }));
+    const watchlistRows = db.prepare(`
+    SELECT w.* FROM watchlist w
+    JOIN watchlist_lists_link wl ON wl.watchlist_id = w.id
+    WHERE wl.list_id = ?
+    ORDER BY w.title
+  `).all(listId);
+    const watchlistItems = watchlistRows.map(row => ({
+        id: -(row.id),
+        title: row.title,
+        tipo: row.tipo,
+        release_year: row.release_year,
+        synopsis: row.synopsis,
+        cover_path: row.cover_path,
+        backdrop_path: row.backdrop_path,
+        duration: row.duration,
+        director: row.director,
+        genres: JSON.parse(row.genres ?? '[]'),
+        cast: JSON.parse(row.cast ?? '[]'),
+        tmdb_id: row.tmdb_id,
+        created_at: row.created_at,
+        watched_status: 'nao_assistido',
+        isProximo: true,
+        watchlistId: row.id,
+        tags: [],
+    }));
+    return [...catalogItems, ...watchlistItems].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
 }
 function addMediaToList(mediaId, listId) {
     const db = (0, database_js_1.getDatabase)();
@@ -254,6 +284,16 @@ function addMediaToList(mediaId, listId) {
 function removeMediaFromList(mediaId, listId) {
     const db = (0, database_js_1.getDatabase)();
     db.prepare('DELETE FROM media_lists_link WHERE media_id = ? AND list_id = ?').run(mediaId, listId);
+    return true;
+}
+function addWatchlistItemToList(watchlistId, listId) {
+    const db = (0, database_js_1.getDatabase)();
+    db.prepare('INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id) VALUES (?, ?)').run(watchlistId, listId);
+    return true;
+}
+function removeWatchlistItemFromList(watchlistId, listId) {
+    const db = (0, database_js_1.getDatabase)();
+    db.prepare('DELETE FROM watchlist_lists_link WHERE watchlist_id = ? AND list_id = ?').run(watchlistId, listId);
     return true;
 }
 // -- ESTATÍSTICAS ------------------------------------------------------------

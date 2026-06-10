@@ -273,10 +273,11 @@ export interface ListRow {
 export function getAllLists(): ListRow[] {
   const db = getDatabase()
   return db.prepare(`
-    SELECT l.*, COUNT(ml.media_id) as media_count
+    SELECT l.*,
+      (SELECT COUNT(*) FROM media_lists_link ml WHERE ml.list_id = l.id) +
+      (SELECT COUNT(*) FROM watchlist_lists_link wl WHERE wl.list_id = l.id)
+      as media_count
     FROM lists l
-    LEFT JOIN media_lists_link ml ON ml.list_id = l.id
-    GROUP BY l.id
     ORDER BY l.name
   `).all() as ListRow[]
 }
@@ -299,21 +300,67 @@ export function deleteList(id: number): boolean {
   return true
 }
 
-export function getMediaInList(listId: number): MediaRow[] {
+export interface MediaInListRow extends MediaRow {
+  isProximo:   boolean
+  watchlistId?: number
+}
+
+export function getMediaInList(listId: number): MediaInListRow[] {
   const db = getDatabase()
-  const rows = db.prepare(`
+
+  const mediaRows = db.prepare(`
     SELECT m.* FROM media m
     JOIN media_lists_link ml ON ml.media_id = m.id
     WHERE ml.list_id = ?
     ORDER BY m.title
   `).all(listId) as MediaRow[]
-  return rows.map(row => ({
+
+  const catalogItems: MediaInListRow[] = mediaRows.map(row => ({
     ...row,
-    genres:   getGenresForMedia(row.id),
-    tags:     getTagsForMedia(row.id),
-    cast:     getCastForMedia(row.id),
-    director: getDirectorForMedia(row.id),
+    genres:    getGenresForMedia(row.id),
+    tags:      getTagsForMedia(row.id),
+    cast:      getCastForMedia(row.id),
+    director:  getDirectorForMedia(row.id),
+    isProximo: false,
   }))
+
+  interface WatchlistLinkRaw {
+    id: number; title: string; tipo: string; release_year: string
+    synopsis: string; cover_path: string; backdrop_path: string
+    duration: number; director: string; genres: string; cast: string
+    tmdb_id: number; created_at: string
+  }
+
+  const watchlistRows = db.prepare(`
+    SELECT w.* FROM watchlist w
+    JOIN watchlist_lists_link wl ON wl.watchlist_id = w.id
+    WHERE wl.list_id = ?
+    ORDER BY w.title
+  `).all(listId) as WatchlistLinkRaw[]
+
+  const watchlistItems: MediaInListRow[] = watchlistRows.map(row => ({
+    id:             -(row.id),
+    title:          row.title,
+    tipo:           row.tipo as 'filme' | 'serie',
+    release_year:   row.release_year,
+    synopsis:       row.synopsis,
+    cover_path:     row.cover_path,
+    backdrop_path:  row.backdrop_path,
+    duration:       row.duration,
+    director:       row.director,
+    genres:         JSON.parse(row.genres ?? '[]'),
+    cast:           JSON.parse(row.cast   ?? '[]'),
+    tmdb_id:        row.tmdb_id,
+    created_at:     row.created_at,
+    watched_status: 'nao_assistido' as const,
+    isProximo:      true,
+    watchlistId:    row.id,
+    tags:           [],
+  }))
+
+  return [...catalogItems, ...watchlistItems].sort((a, b) =>
+    a.title.localeCompare(b.title, 'pt-BR')
+  )
 }
 
 export function addMediaToList(mediaId: number, listId: number): boolean {
@@ -325,6 +372,18 @@ export function addMediaToList(mediaId: number, listId: number): boolean {
 export function removeMediaFromList(mediaId: number, listId: number): boolean {
   const db = getDatabase()
   db.prepare('DELETE FROM media_lists_link WHERE media_id = ? AND list_id = ?').run(mediaId, listId)
+  return true
+}
+
+export function addWatchlistItemToList(watchlistId: number, listId: number): boolean {
+  const db = getDatabase()
+  db.prepare('INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id) VALUES (?, ?)').run(watchlistId, listId)
+  return true
+}
+
+export function removeWatchlistItemFromList(watchlistId: number, listId: number): boolean {
+  const db = getDatabase()
+  db.prepare('DELETE FROM watchlist_lists_link WHERE watchlist_id = ? AND list_id = ?').run(watchlistId, listId)
   return true
 }
 

@@ -69,6 +69,8 @@ function registerIpcHandlers() {
     electron_1.ipcMain.handle('lists:getMedia', (_e, listId) => (0, queries_js_1.getMediaInList)(listId));
     electron_1.ipcMain.handle('lists:addMedia', (_e, mediaId, listId) => (0, queries_js_1.addMediaToList)(mediaId, listId));
     electron_1.ipcMain.handle('lists:removeMedia', (_e, mediaId, listId) => (0, queries_js_1.removeMediaFromList)(mediaId, listId));
+    electron_1.ipcMain.handle('lists:addWatchlistItem', (_e, watchlistId, listId) => (0, queries_js_1.addWatchlistItemToList)(watchlistId, listId));
+    electron_1.ipcMain.handle('lists:removeWatchlistItem', (_e, watchlistId, listId) => (0, queries_js_1.removeWatchlistItemFromList)(watchlistId, listId));
     // Watchlist
     electron_1.ipcMain.handle('watchlist:getAll', () => (0, watchlistQueries_js_1.getAllWatchlist)());
     electron_1.ipcMain.handle('watchlist:add', (_e, input) => {

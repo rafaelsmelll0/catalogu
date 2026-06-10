@@ -104,6 +104,14 @@ function initSchema() {
       tmdb_id       INTEGER,
       created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS watchlist_lists_link (
+      watchlist_id INTEGER NOT NULL,
+      list_id      INTEGER NOT NULL,
+      PRIMARY KEY (watchlist_id, list_id),
+      FOREIGN KEY (watchlist_id) REFERENCES watchlist(id) ON DELETE CASCADE,
+      FOREIGN KEY (list_id)      REFERENCES lists(id)     ON DELETE CASCADE
+    );
   `)
 
   // Migration: adicionar backdrop_path se não existir
@@ -132,6 +140,28 @@ function initSchema() {
         cast          TEXT DEFAULT '[]',
         tmdb_id       INTEGER,
         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  }
+
+  // Migration: backdrop_path na watchlist (bancos antigos sem a coluna)
+  try {
+    db.prepare('SELECT backdrop_path FROM watchlist LIMIT 1').get()
+  } catch {
+    db.exec('ALTER TABLE watchlist ADD COLUMN backdrop_path TEXT')
+  }
+
+  // Migration: watchlist_lists_link (bancos antigos)
+  try {
+    db.prepare('SELECT watchlist_id FROM watchlist_lists_link LIMIT 1').get()
+  } catch {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS watchlist_lists_link (
+        watchlist_id INTEGER NOT NULL,
+        list_id      INTEGER NOT NULL,
+        PRIMARY KEY (watchlist_id, list_id),
+        FOREIGN KEY (watchlist_id) REFERENCES watchlist(id) ON DELETE CASCADE,
+        FOREIGN KEY (list_id)      REFERENCES lists(id)     ON DELETE CASCADE
       )
     `)
   }
