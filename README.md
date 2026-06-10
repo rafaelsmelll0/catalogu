@@ -1,73 +1,117 @@
-# React + TypeScript + Vite
+# Catalogu
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App desktop pessoal para catalogar filmes e séries. Adicione títulos pelo TMDB, dê notas, organize em listas, guarde uma fila de títulos que quer assistir e acompanhe estatísticas do seu catálogo.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Instalação
 
-## React Compiler
+1. Acesse a [página de Releases](https://github.com/rafaelsmelll0/catalogu/releases)
+2. Baixe o arquivo `Catalogu-Setup-X.X.X.exe` da versão mais recente
+3. Execute o instalador — ele vai pedir permissão de administrador, isso é normal
+4. O app será instalado em `C:\Program Files\Catalogu`
+5. Um atalho será criado na área de trabalho
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O app verifica atualizações automaticamente toda vez que é aberto. Quando uma nova versão estiver disponível, você verá uma notificação no canto inferior direito.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Primeiros passos
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Na primeira abertura o catálogo estará vazio. Clique em **+ Adicionar** (ou `Ctrl+N`) para buscar um título pelo nome e adicioná-lo.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Atalhos de teclado
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+| Atalho | Ação |
+|---|---|
+| `Ctrl + K` | Abrir busca |
+| `Ctrl + N` | Adicionar mídia |
+| `Ctrl + 1` | Início |
+| `Ctrl + 2` | Filmes |
+| `Ctrl + 3` | Séries |
+| `Ctrl + 4` | Listas |
+| `Ctrl + 5` | Próximos |
+| `Ctrl + 6` | Estatísticas |
+| `Ctrl + 7` | Configurações |
+| `Esc` | Fechar modal |
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Backup
+
+Em **Configurações → Backup** você pode exportar o banco de dados (um arquivo `.db`) para guardar uma cópia do seu catálogo, e importar um backup anterior com a opção de mesclar ou substituir.
+
+---
+
+## Observação sobre o ícone
+
+> ⚠️ O ícone do atalho e do executável ainda aparece como o ícone padrão do Electron — isso é um problema conhecido que ainda não foi corrigido. Se quiser trocar, clique com o botão direito no atalho da área de trabalho → Propriedades → Alterar ícone, e selecione o arquivo `uninstallerIcon.ico` que fica em `C:\Program Files\Catalogu\`, ou qualquer outro ícone de sua preferência.
+
+---
+
+## Idioma
+
+O app está **100% em português brasileiro**.
+
+---
+
+---
+
+# Catalogu (English)
+
+A personal desktop app for cataloging movies and TV series. Search titles via TMDB, rate them, organize into lists, keep a watchlist of titles you want to see next, and track your stats.
+
+---
+
+## Installation
+
+1. Go to the [Releases page](https://github.com/rafaelsmelll0/catalogu/releases)
+2. Download the `Catalogu-Setup-X.X.X.exe` file from the latest release
+3. Run the installer — it will ask for administrator permission, that's expected
+4. The app will be installed to `C:\Program Files\Catalogu`
+5. A shortcut will be created on your desktop
+
+The app checks for updates automatically every time it opens. When a new version is available, a notification will appear in the bottom-right corner.
+
+---
+
+## Getting started
+
+On first launch the catalog will be empty. Click **+ Adicionar** (or `Ctrl+N`) to search for a title by name and add it.
+
+---
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl + K` | Open search |
+| `Ctrl + N` | Add media |
+| `Ctrl + 1` | Home |
+| `Ctrl + 2` | Movies |
+| `Ctrl + 3` | Series |
+| `Ctrl + 4` | Lists |
+| `Ctrl + 5` | Próximos (Watchlist) |
+| `Ctrl + 6` | Statistics |
+| `Ctrl + 7` | Settings |
+| `Esc` | Close modal |
+
+---
+
+## Backup
+
+Under **Settings → Backup** you can export your database (a `.db` file) to keep a copy of your catalog, and import a previous backup with the option to merge or replace.
+
+---
+
+## Note about the app icon
+
+> ⚠️ The shortcut and executable icon still shows the default Electron icon — this is a known issue that hasn't been fixed yet. If you'd like to change it, right-click the desktop shortcut → Properties → Change Icon, and select the `uninstallerIcon.ico` file located at `C:\Program Files\Catalogu\`, or choose any icon you prefer.
+
+---
+
+## Language
+
+The app interface is **100% in Brazilian Portuguese**. There are no plans for an English translation at this time.

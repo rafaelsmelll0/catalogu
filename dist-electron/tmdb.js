@@ -45,7 +45,7 @@ exports.getBackdropUrl = getBackdropUrl;
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.join(__dirname, '../.env') });
-const API_KEY = process.env.TMDB_API_KEY ?? '';
+const API_KEY = "70bf2d5e385b684dc9828aa58b1da177" ?? "";
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_URL = 'https://image.tmdb.org/t/p/';
 async function fetchJson(url) {
