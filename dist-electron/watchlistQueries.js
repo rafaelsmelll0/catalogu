@@ -5,7 +5,9 @@ exports.addToWatchlist = addToWatchlist;
 exports.removeFromWatchlist = removeFromWatchlist;
 exports.findDuplicateInWatchlist = findDuplicateInWatchlist;
 exports.getWatchlistCount = getWatchlistCount;
+exports.promoteToMedia = promoteToMedia;
 const database_js_1 = require("./database.js");
+const queries_js_1 = require("./queries.js");
 function parseRow(row) {
     return {
         ...row,
@@ -69,4 +71,28 @@ function findDuplicateInWatchlist(tmdbId, title, releaseYear) {
 function getWatchlistCount() {
     const db = (0, database_js_1.getDatabase)();
     return db.prepare('SELECT COUNT(*) as n FROM watchlist').get().n;
+}
+/**
+ * Promove um item de Próximos para o catálogo, preservando os vínculos com listas.
+ *
+ * Feito numa única transação: lê as listas do item da watchlist, cria a mídia no
+ * catálogo, religa a nova mídia a essas listas e só então remove o item da watchlist.
+ * Sem isso, o ON DELETE CASCADE de watchlist_lists_link apagaria os vínculos e o
+ * título sumiria das listas ao ser marcado como assistido.
+ */
+function promoteToMedia(watchlistId, media) {
+    const db = (0, database_js_1.getDatabase)();
+    const run = db.transaction(() => {
+        const listRows = db
+            .prepare('SELECT list_id FROM watchlist_lists_link WHERE watchlist_id = ?')
+            .all(watchlistId);
+        const mediaId = (0, queries_js_1.addMedia)(media);
+        const linkStmt = db.prepare('INSERT OR IGNORE INTO media_lists_link (media_id, list_id) VALUES (?, ?)');
+        for (const { list_id } of listRows) {
+            linkStmt.run(mediaId, list_id);
+        }
+        db.prepare('DELETE FROM watchlist WHERE id = ?').run(watchlistId);
+        return mediaId;
+    });
+    return run();
 }

@@ -15,9 +15,10 @@ import {
 import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
 import {
   getAllWatchlist, addToWatchlist, removeFromWatchlist, getWatchlistCount,
-  findDuplicateInWatchlist,
+  findDuplicateInWatchlist, promoteToMedia,
   type AddWatchlistInput,
 } from './watchlistQueries.js'
+import type { AddMediaInput } from './queries.js'
 import { updateAllImages, type ImageUpdateProgress } from './updateImages.js'
 import fs from 'fs'
 
@@ -60,6 +61,9 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   })
   ipcMain.handle('watchlist:remove', (_e, id: number) => removeFromWatchlist(id))
   ipcMain.handle('watchlist:count',  ()               => getWatchlistCount())
+  ipcMain.handle('watchlist:promote', (_e, watchlistId: number, media: AddMediaInput) =>
+    promoteToMedia(watchlistId, media)
+  )
 
   // Verificações de duplicata
   ipcMain.handle('media:findDuplicate',     (_e, tmdbId: number | null, title: string, releaseYear?: string) =>

@@ -3,6 +3,7 @@ import { theme } from '../styles/theme.ts'
 import type { WatchlistItem } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
+import { ipc } from '../lib/ipc.ts'
 import { Modal, Button, RatingSlider, Textarea, Select, type SelectOption } from './ui/index.ts'
 import { showToast } from './Toast.tsx'
 
@@ -22,8 +23,8 @@ interface Props {
 }
 
 export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
-  const { addMedia }   = useMediaStore()
-  const { removeItem } = useWatchlistStore()
+  const fetchMedia     = useMediaStore(s => s.fetchAll)
+  const fetchWatchlist = useWatchlistStore(s => s.fetchAll)
   const [rating, setRating]             = useState(0)
   const [observations, setObservations] = useState('')
   const [status, setStatus]             = useState<Status>('assistido')
@@ -32,7 +33,9 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
   async function handleSave() {
     setSaving(true)
     try {
-      await addMedia({
+      // Promoção atômica no backend: cria a mídia, preserva os vínculos com listas
+      // e remove o item de Próximos numa única transação.
+      await ipc<number>('watchlist:promote', item.id, {
         title:          item.title,
         tipo:           item.tipo,
         release_year:   item.release_year,
@@ -48,7 +51,7 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
         rating:         rating > 0 ? rating : undefined,
         observations:   observations.trim() || undefined,
       })
-      await removeItem(item.id)
+      await Promise.all([fetchMedia(), fetchWatchlist()])
       showToast(`"${item.title}" adicionado ao catálogo!`)
       onDone()
     } catch {

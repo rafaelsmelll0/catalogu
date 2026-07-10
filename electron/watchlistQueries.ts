@@ -1,4 +1,5 @@
 import { getDatabase } from './database.js'
+import { addMedia, type AddMediaInput } from './queries.js'
 
 export interface WatchlistRow {
   id:            number
@@ -110,4 +111,37 @@ export function findDuplicateInWatchlist(tmdbId: number | null, title: string, r
 export function getWatchlistCount(): number {
   const db = getDatabase()
   return (db.prepare('SELECT COUNT(*) as n FROM watchlist').get() as { n: number }).n
+}
+
+/**
+ * Promove um item de Próximos para o catálogo, preservando os vínculos com listas.
+ *
+ * Feito numa única transação: lê as listas do item da watchlist, cria a mídia no
+ * catálogo, religa a nova mídia a essas listas e só então remove o item da watchlist.
+ * Sem isso, o ON DELETE CASCADE de watchlist_lists_link apagaria os vínculos e o
+ * título sumiria das listas ao ser marcado como assistido.
+ */
+export function promoteToMedia(watchlistId: number, media: AddMediaInput): number {
+  const db = getDatabase()
+
+  const run = db.transaction((): number => {
+    const listRows = db
+      .prepare('SELECT list_id FROM watchlist_lists_link WHERE watchlist_id = ?')
+      .all(watchlistId) as { list_id: number }[]
+
+    const mediaId = addMedia(media)
+
+    const linkStmt = db.prepare(
+      'INSERT OR IGNORE INTO media_lists_link (media_id, list_id) VALUES (?, ?)'
+    )
+    for (const { list_id } of listRows) {
+      linkStmt.run(mediaId, list_id)
+    }
+
+    db.prepare('DELETE FROM watchlist WHERE id = ?').run(watchlistId)
+
+    return mediaId
+  })
+
+  return run()
 }
