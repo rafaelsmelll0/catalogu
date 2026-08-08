@@ -19,7 +19,7 @@
     "rebuild:node": "npm rebuild better-sqlite3",
     "rebuild:electron": "electron-builder install-app-deps",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win && node scripts/set-icon.mjs",
+    "dist": "npm run build && electron-builder --win",
     "preview": "vite preview"
   },
   "build": {
@@ -55,6 +55,7 @@
         ]
       }
     ],
+    "afterPack": "./scripts/afterPack.cjs",
     "win": {
       "icon": "src/assets/catalogu.ico",
       "requestedExecutionLevel": "requireAdministrator",

@@ -45,12 +45,6 @@ Em **Configurações → Backup** você pode exportar o banco de dados (um arqui
 
 ---
 
-## Observação sobre o ícone
-
-> ⚠️ O ícone do atalho e do executável ainda aparece como o ícone padrão do Electron — isso é um problema conhecido que ainda não foi corrigido. Se quiser trocar, clique com o botão direito no atalho da área de trabalho → Propriedades → Alterar ícone, e selecione o arquivo `uninstallerIcon.ico` que fica em `C:\Program Files\Catalogu\`, ou qualquer outro ícone de sua preferência.
-
----
-
 ## Idioma
 
 O app está **100% em português brasileiro**.
@@ -103,12 +97,6 @@ On first launch the catalog will be empty. Click **+ Adicionar** (or `Ctrl+N`) t
 ## Backup
 
 Under **Settings → Backup** you can export your database (a `.db` file) to keep a copy of your catalog, and import a previous backup with the option to merge or replace.
-
----
-
-## Note about the app icon
-
-> ⚠️ The shortcut and executable icon still shows the default Electron icon — this is a known issue that hasn't been fixed yet. If you'd like to change it, right-click the desktop shortcut → Properties → Change Icon, and select the `uninstallerIcon.ico` file located at `C:\Program Files\Catalogu\`, or choose any icon you prefer.
 
 ---
 
