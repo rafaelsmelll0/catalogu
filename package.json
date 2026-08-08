@@ -38,7 +38,9 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "node_modules/better-sqlite3/**/*"
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
     ],
     "extraResources": [
       {
@@ -98,6 +100,7 @@
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0",
     "recharts": "^3.8.1",
+    "sharp": "^0.34.5",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -118,7 +121,6 @@
     "globals": "^17.6.0",
     "png-to-ico": "^3.0.1",
     "rcedit": "^4.0.1",
-    "sharp": "^0.34.5",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",

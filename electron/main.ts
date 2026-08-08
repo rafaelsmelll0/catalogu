@@ -20,14 +20,18 @@ import {
 } from './watchlistQueries.js'
 import type { AddMediaInput } from './queries.js'
 import { updateAllImages, type ImageUpdateProgress } from './updateImages.js'
+import { registerImageScheme, serveImageProtocol, localizeMediaImages } from './imageStore.js'
 import fs from 'fs'
 
 const isDev = process.env.NODE_ENV === 'development'
 
+// Precisa rodar antes de app.whenReady() para o renderer poder carregar catimg://
+registerImageScheme()
+
 function registerIpcHandlers() {
   ipcMain.handle('media:getAll',      () => getAllMedia())
   ipcMain.handle('media:getById',     (_e, id: number) => getMediaById(id))
-  ipcMain.handle('media:add',         (_e, input) => addMedia(input))
+  ipcMain.handle('media:add',         async (_e, input) => addMedia(await localizeMediaImages(input)))
   ipcMain.handle('media:update',      (_e, id: number, input) => updateMedia(id, input))
   ipcMain.handle('media:delete',      (_e, id: number) => deleteMedia(id))
   ipcMain.handle('tags:getAll',       () => getAllTags())
@@ -61,8 +65,8 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
   })
   ipcMain.handle('watchlist:remove', (_e, id: number) => removeFromWatchlist(id))
   ipcMain.handle('watchlist:count',  ()               => getWatchlistCount())
-  ipcMain.handle('watchlist:promote', (_e, watchlistId: number, media: AddMediaInput) =>
-    promoteToMedia(watchlistId, media)
+  ipcMain.handle('watchlist:promote', async (_e, watchlistId: number, media: AddMediaInput) =>
+    promoteToMedia(watchlistId, await localizeMediaImages(media))
   )
 
   // Verificações de duplicata
@@ -228,6 +232,7 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  serveImageProtocol()
   setDbPath(path.join(app.getPath('userData'), 'catalogu.db'))
   registerIpcHandlers()
   const win = createWindow()

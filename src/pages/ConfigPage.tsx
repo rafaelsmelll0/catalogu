@@ -221,16 +221,17 @@ export function ConfigPage() {
       {/* Atualizar imagens */}
       <div style={sectionStyle}>
         <h2 style={{ fontSize: theme.fontSizes.h3, fontWeight: theme.fontWeights.bold, marginBottom: theme.spacing.xs }}>
-          Atualizar imagens
+          Salvar imagens localmente
         </h2>
         <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui, marginBottom: theme.spacing.lg }}>
-          Busca no TMDB a capa e a imagem de fundo (backdrop) dos títulos que ainda não têm.
-          Títulos sem TMDB ID são ignorados.
+          Baixa as capas e imagens de fundo (backdrop) e as guarda no seu computador em
+          formato webp (bem leves), para o catálogo funcionar rápido e offline, sem depender do TMDB.
+          Também busca as que estão faltando. Títulos novos já são salvos localmente automaticamente.
         </p>
 
         {!updatingImages && !imageResult && (
           <Button onClick={handleUpdateImages}>
-            ↻ Buscar imagens
+            ↓ Salvar imagens no computador
           </Button>
         )}
 
