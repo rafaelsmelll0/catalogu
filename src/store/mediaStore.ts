@@ -64,7 +64,8 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       await get().fetchAll()
       showToast(`"${input.title}" adicionado com sucesso!`)
       return id
-    } catch {
+    } catch (err) {
+      console.error('[mediaStore.addMedia]', err)
       showToast('Erro ao adicionar mídia.', 'error')
       throw new Error('Erro ao adicionar')
     }
@@ -76,7 +77,8 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       await window.electronAPI.invoke('media:delete', id)
       await get().fetchAll()
       showToast(`"${item?.title ?? 'Item'}" removido.`, 'info')
-    } catch {
+    } catch (err) {
+      console.error('[mediaStore.deleteMedia]', err)
       showToast('Erro ao remover.', 'error')
     }
   },
@@ -86,7 +88,8 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       await window.electronAPI.invoke('media:update', id, input)
       await get().fetchAll()
       showToast('Alterações salvas!')
-    } catch {
+    } catch (err) {
+      console.error('[mediaStore.updateMedia]', err)
       showToast('Erro ao salvar alterações.', 'error')
       throw new Error('Erro ao atualizar')
     }

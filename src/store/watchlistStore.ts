@@ -19,7 +19,8 @@ export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
     try {
       const items = await window.electronAPI.invoke('watchlist:getAll') as WatchlistItem[]
       set({ items, loading: false })
-    } catch {
+    } catch (err) {
+      console.error('[watchlistStore.fetchAll]', err)
       set({ loading: false })
     }
   },

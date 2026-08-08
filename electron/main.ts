@@ -97,6 +97,7 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
       fs.copyFileSync(dbSrc, result.filePath)
       return { success: true, path: result.filePath }
     } catch (err) {
+      log.error('Erro ao exportar backup:', err)
       return { success: false, error: String(err) }
     }
   })
@@ -122,7 +123,7 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
     try {
       if (mode === 'replace') {
         const { getDatabase } = await import('./database.js')
-        try { (getDatabase() as any).close() } catch {}
+        try { (getDatabase() as any).close() } catch (err) { log.debug('Banco já estava fechado:', err) }
         fs.copyFileSync(dbPath, dbDest)
         const { setDbPath } = await import('./database.js')
         setDbPath(dbDest)
@@ -178,6 +179,7 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
       srcDb.close()
       return { success: true, imported, skipped, mode: 'merge' }
     } catch (err) {
+      log.error('Erro ao importar backup:', err)
       return { success: false, error: String(err) }
     }
   })
