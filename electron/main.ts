@@ -145,11 +145,11 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
           INSERT INTO media (
             title, release_year, synopsis, observations, rating,
             duration, watched, cover_path, backdrop_path,
-            tipo, watched_status, tmdb_id, created_at
+            tipo, watched_status, tmdb_id, watched_date, created_at
           ) VALUES (
             @title, @release_year, @synopsis, @observations, @rating,
             @duration, @watched, @cover_path, @backdrop_path,
-            @tipo, @watched_status, @tmdb_id, @created_at
+            @tipo, @watched_status, @tmdb_id, @watched_date, @created_at
           )
         `).run({
           title:          m.title,
@@ -164,6 +164,8 @@ ipcMain.handle('lists:getAll',      () => getAllLists())
           tipo:           m.tipo,
           watched_status: m.watched_status ?? 'assistido',
           tmdb_id:        m.tmdb_id       ?? null,
+          // Backups mais antigos não têm watched_date; usa a data de cadastro como fallback.
+          watched_date:   m.watched_date  ?? (m.created_at ? String(m.created_at).slice(0, 10) : null),
           created_at:     m.created_at    ?? new Date().toISOString(),
         })
         imported++

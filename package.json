@@ -13,6 +13,11 @@
     "build:react": "tsc && vite build",
     "build:electron": "tsc -p electron/tsconfig.json",
     "build": "vite build && tsc -p electron/tsconfig.json && node scripts/inject-env.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest": "npm rebuild better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "rebuild:electron": "electron-builder install-app-deps",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder --win && node scripts/set-icon.mjs",
     "preview": "vite preview"
@@ -119,6 +124,7 @@
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
     "vite-plugin-svgr": "^5.2.0",
+    "vitest": "^4.1.10",
     "wait-on": "^9.0.10"
   }
 }

@@ -32,6 +32,7 @@ function initSchema() {
       tipo TEXT NOT NULL CHECK(tipo IN ('filme','serie')),
       watched_status TEXT DEFAULT 'assistido' CHECK(watched_status IN ('assistido','assistindo','nao_assistido','nao_lembro')),
       tmdb_id INTEGER,
+      watched_date TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -119,6 +120,15 @@ function initSchema() {
     db.prepare('SELECT backdrop_path FROM media LIMIT 1').get()
   } catch {
     db.exec('ALTER TABLE media ADD COLUMN backdrop_path TEXT')
+  }
+
+  // Migration: watched_date (data em que assistiu). Nos títulos já existentes,
+  // faz backfill usando a data de cadastro (created_at) como data assistida.
+  try {
+    db.prepare('SELECT watched_date FROM media LIMIT 1').get()
+  } catch {
+    db.exec('ALTER TABLE media ADD COLUMN watched_date TEXT')
+    db.exec("UPDATE media SET watched_date = date(created_at) WHERE watched_date IS NULL")
   }
 
   // Migration: criar watchlist em bancos antigos

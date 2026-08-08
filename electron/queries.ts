@@ -17,6 +17,7 @@ export interface MediaRow {
   tipo: 'filme' | 'serie'
   watched_status: 'assistido' | 'assistindo' | 'nao_assistido' | 'nao_lembro'
   tmdb_id?: number
+  watched_date?: string
   created_at: string
   genres?: string[]
   tags?: string[]
@@ -38,6 +39,7 @@ export interface AddMediaInput {
   tipo: 'filme' | 'serie'
   watched_status?: 'assistido' | 'assistindo' | 'nao_assistido' | 'nao_lembro'
   tmdb_id?: number
+  watched_date?: string
   genres?: string[]
   tags?: string[]
   director?: string
@@ -53,13 +55,57 @@ export function getAllMedia(): MediaRow[] {
     SELECT * FROM media ORDER BY created_at DESC
   `).all() as MediaRow[]
 
+  // Em lote: uma query por tipo de associação (5 no total), em vez de 4 por linha.
+  // Evita o N+1 que fica caro conforme o catálogo cresce.
+  const genres    = getNameMapByMedia('genres',  'media_genres_link', 'genre_id')
+  const tags      = getNameMapByMedia('tags',    'media_tags_link',   'tag_id')
+  const cast      = getPeopleMapByMedia('actor')
+  const directors = getPeopleMapByMedia('director')
+
   return rows.map(row => ({
     ...row,
-    genres:   getGenresForMedia(row.id),
-    tags:     getTagsForMedia(row.id),
-    cast:     getCastForMedia(row.id),
-    director: getDirectorForMedia(row.id),
+    genres:   genres.get(row.id)    ?? [],
+    tags:     tags.get(row.id)      ?? [],
+    cast:     cast.get(row.id)      ?? [],
+    director: directors.get(row.id)?.[0],
   }))
+}
+
+/** Mapa media_id -> nomes, para gêneros ou tags, em uma única query. */
+function getNameMapByMedia(
+  nameTable: 'genres' | 'tags',
+  linkTable: 'media_genres_link' | 'media_tags_link',
+  fkColumn: 'genre_id' | 'tag_id',
+): Map<number, string[]> {
+  const db = getDatabase()
+  const rows = db.prepare(`
+    SELECT l.media_id AS mediaId, n.name AS name
+    FROM ${nameTable} n
+    JOIN ${linkTable} l ON l.${fkColumn} = n.id
+  `).all() as { mediaId: number; name: string }[]
+  return groupNames(rows)
+}
+
+/** Mapa media_id -> nomes de pessoas por papel (actor/director), em uma única query. */
+function getPeopleMapByMedia(role: 'actor' | 'director'): Map<number, string[]> {
+  const db = getDatabase()
+  const rows = db.prepare(`
+    SELECT l.media_id AS mediaId, p.name AS name
+    FROM people p
+    JOIN media_people_link l ON l.person_id = p.id
+    WHERE l.role = ?
+  `).all(role) as { mediaId: number; name: string }[]
+  return groupNames(rows)
+}
+
+function groupNames(rows: { mediaId: number; name: string }[]): Map<number, string[]> {
+  const map = new Map<number, string[]>()
+  for (const r of rows) {
+    const arr = map.get(r.mediaId)
+    if (arr) arr.push(r.name)
+    else map.set(r.mediaId, [r.name])
+  }
+  return map
 }
 
 export function getMediaById(id: number): MediaRow | null {
@@ -84,11 +130,11 @@ export function addMedia(input: AddMediaInput): number {
     INSERT INTO media (
       title, release_year, synopsis, observations, rating,
       duration, watched, cover_path, cover_path_thumb, backdrop_path,
-      tipo, watched_status, tmdb_id
+      tipo, watched_status, tmdb_id, watched_date
     ) VALUES (
       @title, @release_year, @synopsis, @observations, @rating,
       @duration, @watched, @cover_path, @cover_path_thumb, @backdrop_path,
-      @tipo, @watched_status, @tmdb_id
+      @tipo, @watched_status, @tmdb_id, @watched_date
     )
   `)
 
@@ -106,6 +152,7 @@ export function addMedia(input: AddMediaInput): number {
     tipo:             mediaFields.tipo,
     watched_status:   mediaFields.watched_status   ?? 'assistido',
     tmdb_id:          mediaFields.tmdb_id          ?? null,
+    watched_date:     mediaFields.watched_date     ?? null,
   })
 
   const mediaId = result.lastInsertRowid as number
@@ -404,6 +451,41 @@ const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched
     proximos = (db.prepare('SELECT COUNT(*) as n FROM watchlist').get() as { n: number }).n
   } catch { /* tabela pode não existir em bancos antigos */ }
 
+  // Gênero favorito (mais frequente no catálogo)
+  const generoRow = db.prepare(`
+    SELECT g.name AS name, COUNT(*) AS n
+    FROM genres g
+    JOIN media_genres_link l ON l.genre_id = g.id
+    GROUP BY g.id
+    ORDER BY n DESC, g.name ASC
+    LIMIT 1
+  `).get() as { name: string; n: number } | undefined
+
+  // Tempo assistido: soma das durações (minutos) dos títulos assistidos
+  const minutos = (db.prepare(`
+    SELECT COALESCE(SUM(duration), 0) AS min
+    FROM media
+    WHERE watched_status = 'assistido' AND duration IS NOT NULL
+  `).get() as { min: number }).min
+
+  // Distribuição de notas por estrela (1..5)
+  const distribuicaoNotas = (db.prepare(`
+    SELECT CAST(ROUND(rating) AS INTEGER) AS estrela, COUNT(*) AS n
+    FROM media
+    WHERE rating IS NOT NULL AND rating > 0
+    GROUP BY estrela
+    ORDER BY estrela
+  `).all() as { estrela: number; n: number }[]).map(r => ({ estrela: r.estrela, count: r.n }))
+
+  // Assistidos por ano (usa a data assistida)
+  const porAno = (db.prepare(`
+    SELECT substr(watched_date, 1, 4) AS ano, COUNT(*) AS n
+    FROM media
+    WHERE watched_date IS NOT NULL AND watched_status = 'assistido'
+    GROUP BY ano
+    ORDER BY ano
+  `).all() as { ano: string; n: number }[]).map(r => ({ ano: r.ano, count: r.n }))
+
   return {
     total,
     filmes,
@@ -412,5 +494,10 @@ const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched
     naoAssistidos,
     mediaRating: avgRow.avg ? Math.round(avgRow.avg * 10) / 10 : 0,
     proximos,
+    generoFavorito: generoRow ? { name: generoRow.name, count: generoRow.n } : null,
+    minutosAssistidos: minutos,
+    horasAssistidas: Math.round(minutos / 60),
+    distribuicaoNotas,
+    porAno,
   }
 }
