@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
+import { todayLocal } from '../lib/date.ts'
 import type { Media, WatchlistItem } from '../types/index.ts'
 import { MarkAsWatchedModal } from './MarkAsWatchedModal.tsx'
 import {
@@ -46,6 +47,7 @@ interface FormData {
   backdrop_path:  string
   tipo:           TipoMidia
   watched_status: Status
+  watched_date:   string
   genres:         string
   director:       string
   cast:           string
@@ -55,7 +57,7 @@ interface FormData {
 const EMPTY_FORM: FormData = {
   title: '', release_year: '', synopsis: '', observations: '',
   rating: 0, duration: '', watched: '', cover_path: '', backdrop_path: '',
-  tipo: 'filme', watched_status: 'assistido',
+  tipo: 'filme', watched_status: 'assistido', watched_date: '',
   genres: '', director: '', cast: '', tmdb_id: null,
 }
 
@@ -237,6 +239,7 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
         backdrop_path:  form.backdrop_path  || undefined,
         tipo:           form.tipo,
         watched_status: form.watched_status,
+        watched_date:   form.watched_status === 'assistido' ? (form.watched_date || todayLocal()) : undefined,
         genres:         form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
         director:       form.director       || undefined,
         cast:           form.cast   ? form.cast.split(',').map(c => c.trim()).filter(Boolean)   : [],
@@ -669,6 +672,16 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
 
                 {mode !== 'watchlist' && (
                   <RatingSlider value={form.rating} onChange={v => setForm(f => ({ ...f, rating: v }))} />
+                )}
+
+                {mode !== 'watchlist' && form.watched_status === 'assistido' && (
+                  <Input
+                    label="Data em que assistiu"
+                    type="date"
+                    value={form.watched_date || todayLocal()}
+                    max={todayLocal()}
+                    onChange={e => setForm(f => ({ ...f, watched_date: e.target.value }))}
+                  />
                 )}
 
                 <Input label="Gêneros (separados por vírgula)" value={form.genres}

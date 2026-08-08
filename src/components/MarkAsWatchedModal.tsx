@@ -4,7 +4,8 @@ import type { WatchlistItem } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { ipc } from '../lib/ipc.ts'
-import { Modal, Button, RatingSlider, Textarea, Select, type SelectOption } from './ui/index.ts'
+import { todayLocal } from '../lib/date.ts'
+import { Modal, Button, RatingSlider, Textarea, Select, Input, type SelectOption } from './ui/index.ts'
 import { showToast } from './Toast.tsx'
 
 type Status = 'assistido' | 'assistindo' | 'nao_assistido' | 'nao_lembro'
@@ -28,6 +29,7 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
   const [rating, setRating]             = useState(0)
   const [observations, setObservations] = useState('')
   const [status, setStatus]             = useState<Status>('assistido')
+  const [watchedDate, setWatchedDate]   = useState(todayLocal())
   const [saving, setSaving]             = useState(false)
 
   async function handleSave() {
@@ -50,6 +52,7 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
         watched_status: status,
         rating:         rating > 0 ? rating : undefined,
         observations:   observations.trim() || undefined,
+        watched_date:   status === 'assistido' && watchedDate ? watchedDate : undefined,
       })
       await Promise.all([fetchMedia(), fetchWatchlist()])
       showToast(`"${item.title}" adicionado ao catálogo!`)
@@ -111,6 +114,15 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
             onChange={setStatus}
             fullWidth
           />
+          {status === 'assistido' && (
+            <Input
+              label="Data em que assistiu"
+              type="date"
+              value={watchedDate}
+              max={todayLocal()}
+              onChange={e => setWatchedDate(e.target.value)}
+            />
+          )}
           <RatingSlider
             value={rating}
             onChange={setRating}

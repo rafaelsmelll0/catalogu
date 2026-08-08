@@ -3,6 +3,7 @@ import { theme } from '../styles/theme.ts'
 import type { Media } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { EditMediaModal } from './EditMediaModal.tsx'
+import { formatDateBR } from '../lib/date.ts'
 import { Modal, Button, Badge } from './ui/index.ts'
 
 interface Props {
@@ -203,6 +204,12 @@ export function DetailsModal({ media, onClose }: Props) {
                 <>
                   <span style={{ opacity: 0.3 }}>·</span>
                   <span>Dir. {media.director}</span>
+                </>
+              )}
+              {media.watched_status === 'assistido' && media.watched_date && (
+                <>
+                  <span style={{ opacity: 0.3 }}>·</span>
+                  <span>👁 Assistido em {formatDateBR(media.watched_date)}</span>
                 </>
               )}
             </div>

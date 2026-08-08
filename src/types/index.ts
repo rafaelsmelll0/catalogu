@@ -17,6 +17,7 @@ export interface Media {
   tipo: MediaType
   watched_status: WatchedStatus
   tmdb_id?: number
+  watched_date?: string
   created_at: string
   genres?: string[]
   tags?: string[]
@@ -43,13 +44,18 @@ export interface MediaList {
 }
 
 export interface AppStats {
-  total:         number
-  filmes:        number
-  series:        number
-  assistidos:    number
-  naoAssistidos: number
-  mediaRating:   number
-  proximos:      number
+  total:            number
+  filmes:           number
+  series:           number
+  assistidos:       number
+  naoAssistidos:    number
+  mediaRating:      number
+  proximos:         number
+  generoFavorito:   { name: string; count: number } | null
+  minutosAssistidos: number
+  horasAssistidas:  number
+  distribuicaoNotas: { estrela: number; count: number }[]
+  porAno:           { ano: string; count: number }[]
 }
 
 export interface WatchlistItem {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
+import { todayLocal } from '../lib/date.ts'
 import type { Media } from '../types/index.ts'
 import {
   Modal, Button, Input, Textarea, Select, RatingSlider,
@@ -42,6 +43,7 @@ export function EditMediaModal({ media, onClose, onSaved }: Props) {
     duration:       String(media.duration ?? ''),
     watched:        String(media.watched  ?? ''),
     cover_path:     media.cover_path    ?? '',
+    watched_date:   media.watched_date  ?? '',
     tipo:           media.tipo          as TipoMidia,
     watched_status: media.watched_status as Status,
     genres:         (media.genres  ?? []).join(', '),
@@ -65,6 +67,7 @@ export function EditMediaModal({ media, onClose, onSaved }: Props) {
         cover_path:     form.cover_path || undefined,
         tipo:           form.tipo,
         watched_status: form.watched_status,
+        watched_date:   form.watched_status === 'assistido' ? (form.watched_date || undefined) : undefined,
         genres:         form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
         director:       form.director || undefined,
         cast:           form.cast ? form.cast.split(',').map(c => c.trim()).filter(Boolean) : [],
@@ -150,6 +153,16 @@ export function EditMediaModal({ media, onClose, onSaved }: Props) {
             value={form.rating}
             onChange={v => setForm(f => ({ ...f, rating: v }))}
           />
+
+          {form.watched_status === 'assistido' && (
+            <Input
+              label="Data em que assistiu"
+              type="date"
+              value={form.watched_date}
+              max={todayLocal()}
+              onChange={e => setForm(f => ({ ...f, watched_date: e.target.value }))}
+            />
+          )}
 
           <Input
             label="Gêneros (vírgula)"

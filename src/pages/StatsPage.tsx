@@ -168,6 +168,30 @@ export function StatsPage() {
             <span style={labelStyle}>Próximos</span>
           </div>
         )}
+        {stats.horasAssistidas > 0 && (
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              <AnimatedNum value={stats.horasAssistidas} color={theme.colors.info} />
+              <span style={{ fontSize: '20px', fontWeight: theme.fontWeights.black, color: theme.colors.textMuted }}>h</span>
+            </div>
+            <span style={labelStyle}>Tempo assistido</span>
+          </div>
+        )}
+        {stats.generoFavorito && (
+          <div style={cardStyle}>
+            <span style={{
+              fontSize: '26px',
+              fontWeight: theme.fontWeights.black,
+              fontFamily: theme.fonts.display,
+              color: theme.colors.primary,
+              lineHeight: 1.1,
+              textAlign: 'center',
+            }}>
+              {stats.generoFavorito.name}
+            </span>
+            <span style={labelStyle}>Gênero favorito</span>
+          </div>
+        )}
       </div>
 
       {/* Gráficos principais */}
@@ -234,6 +258,25 @@ export function StatsPage() {
                 cursor={{ fill: 'rgba(128, 85, 208, 0.1)' }}
               />
               <Bar dataKey="value" fill={theme.colors.primary} radius={[0, 6, 6, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Assistidos por ano */}
+      {stats.porAno.length > 0 && (
+        <div style={{ ...chartCardStyle, marginBottom: theme.spacing.lg }}>
+          <h2 style={chartTitleStyle}>Assistidos por Ano</h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={stats.porAno}>
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.surfaceElevated} />
+              <XAxis dataKey="ano" stroke={theme.colors.textMuted} fontSize={11} />
+              <YAxis stroke={theme.colors.textMuted} fontSize={11} allowDecimals={false} />
+              <ReTooltip
+                contentStyle={chartTooltipStyle}
+                cursor={{ fill: 'rgba(128, 85, 208, 0.1)' }}
+              />
+              <Bar dataKey="count" name="Assistidos" fill={theme.colors.info} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
