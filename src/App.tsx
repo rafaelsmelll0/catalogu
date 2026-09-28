@@ -10,6 +10,7 @@ import { UpdateNotification } from './components/UpdateNotification.tsx'
 import { UIPlaygroundPage } from './pages/UIPlaygroundPage.tsx'
 import { ConfigPage } from './pages/ConfigPage.tsx'
 import { ProximosPage } from './pages/ProximosPage.tsx'
+import { ParaVocePage } from './pages/ParaVocePage.tsx'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="stats"  element={<StatsPage />} />
           <Route path="listas"    element={<ListasPage />} />
           <Route path="proximos"  element={<ProximosPage />} />
+          <Route path="para-voce" element={<ParaVocePage />} />
           <Route path="ui"     element={<UIPlaygroundPage />} />
           <Route path="config" element={<ConfigPage />} />
         </Route>

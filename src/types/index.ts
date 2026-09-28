@@ -91,3 +91,62 @@ export interface ListCandidate {
   sourceId:        number
   watched_status?: string
 }
+
+// ─── IA ─────────────────────────────────────────────────────────────────────
+
+export type AiProvider = 'deepseek' | 'groq'
+
+export interface AiSettings {
+  provider:  AiProvider
+  model:     string
+  thinking:  boolean
+  hasKey:    boolean
+  keyLast4?: string
+  providers: Record<AiProvider, { label: string; defaultModel: string; keysUrl: string }>
+}
+
+/** Resposta padrão dos canais ai:* (erros já vêm com mensagem para o usuário). */
+export type AiResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
+export interface TasteProfile {
+  text:         string
+  summary:      string
+  generatedAt:  string
+  basedOn:      number
+  edited:       boolean
+  catalogCount: number
+}
+
+export type SuggestionVerdict = 'added' | 'seen' | 'dismissed'
+
+export interface Suggestion {
+  tmdbId:        number
+  tipo:          MediaType
+  title:         string
+  originalTitle: string
+  year:          string
+  posterUrl:     string | null
+  backdropUrl:   string | null
+  overview:      string
+  genres:        string[]
+  duration:      number | null
+  director:      string | null
+  voteAverage:   number | null
+  why:           string
+  similarTo:     string[]
+  warning:       string | null
+  status?:       SuggestionVerdict
+}
+
+export interface RecommendRequest {
+  count:  number
+  tipo:   'filme' | 'serie' | 'ambos'
+  pedido: string
+}
+
+export interface RecommendResult {
+  generatedAt: string
+  request:     RecommendRequest
+  items:       Suggestion[]
+  discarded:   number
+}

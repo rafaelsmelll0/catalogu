@@ -4,6 +4,7 @@ import { Button, Modal } from '../components/ui/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { showToast } from '../components/Toast.tsx'
+import { AiSettingsSection } from '../components/AiSettingsSection.tsx'
 
 interface ImageProgress {
   current: number
@@ -181,6 +182,8 @@ export function ConfigPage() {
         CONFIGURAÇÕES
       </h1>
 
+      <AiSettingsSection sectionStyle={sectionStyle} />
+
       {/* Backup */}
       <div style={sectionStyle}>
         <h2 style={{ fontSize: theme.fontSizes.h3, fontWeight: theme.fontWeights.bold, marginBottom: theme.spacing.xs }}>
@@ -342,8 +345,9 @@ export function ConfigPage() {
           { keys: ['Ctrl', '3'],      desc: 'Ir para Séries' },
           { keys: ['Ctrl', '4'],      desc: 'Ir para Listas' },
           { keys: ['Ctrl', '5'],      desc: 'Ir para Próximos' },
-          { keys: ['Ctrl', '6'],      desc: 'Ir para Estatísticas' },
-          { keys: ['Ctrl', '7'],      desc: 'Ir para Configurações' },
+          { keys: ['Ctrl', '6'],      desc: 'Ir para Para Você' },
+          { keys: ['Ctrl', '7'],      desc: 'Ir para Estatísticas' },
+          { keys: ['Ctrl', '8'],      desc: 'Ir para Configurações' },
         ].map(({ keys, desc }) => (
           <div key={desc} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',

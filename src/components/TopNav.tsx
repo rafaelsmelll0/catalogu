@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { label: 'Séries',       path: '/series' },
   { label: 'Listas',       path: '/listas' },
   { label: 'Próximos',     path: '/proximos' },
+  { label: 'Para Você',    path: '/para-voce' },
   { label: 'Estatísticas', path: '/stats' },
   { label: 'Configurações', path: '/config' },
 ]
@@ -59,8 +60,9 @@ export function TopNav() {
     'ctrl+3': () => navigate('/series'),
     'ctrl+4': () => navigate('/listas'),
     'ctrl+5': () => navigate('/proximos'),
-    'ctrl+6': () => navigate('/stats'),
-    'ctrl+7': () => navigate('/config'),
+    'ctrl+6': () => navigate('/para-voce'),
+    'ctrl+7': () => navigate('/stats'),
+    'ctrl+8': () => navigate('/config'),
   }), [navigate])
   useKeyboardShortcuts(shortcuts)
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log'
 import path from 'path'
@@ -20,6 +20,14 @@ import {
 } from './watchlistQueries.js'
 import type { AddMediaInput } from './queries.js'
 import { exportBackup, mergeBackup } from './backup.js'
+import { getPublicSettings, saveSettings, getActiveConfig, type SaveSettingsInput } from './aiSettings.js'
+import { listModels, AiError } from './aiClient.js'
+import {
+  getProfile, generateProfile, saveProfileText,
+  recommend, getLastRecommendations, setFeedback, addSuggestionToWatchlist,
+  type Verdict,
+} from './aiService.js'
+import type { RecommendRequest } from './aiPrompts.js'
 import { updateAllImages, type ImageUpdateProgress, type ImageUpdateResult } from './updateImages.js'
 import { registerImageScheme, serveImageProtocol, localizeMediaImages, deleteLocalImage } from './imageStore.js'
 import fs from 'fs'
@@ -70,6 +78,32 @@ function registerIpcHandlers() {
   ipcMain.handle('lists:removeMedia',          (_e, mediaId: number, listId: number)     => removeMediaFromList(mediaId, listId))
   ipcMain.handle('lists:addWatchlistItem',    (_e, watchlistId: number, listId: number) => addWatchlistItemToList(watchlistId, listId))
   ipcMain.handle('lists:removeWatchlistItem', (_e, watchlistId: number, listId: number) => removeWatchlistItemFromList(watchlistId, listId))
+
+  // IA — erros viram { ok: false, error } com mensagem pronta para o usuário
+  const aiCall = <T>(fn: () => Promise<T> | T) => async () => {
+    try {
+      return { ok: true as const, data: await fn() }
+    } catch (err) {
+      if (!(err instanceof AiError)) log.error('[ai] erro inesperado:', err)
+      return { ok: false as const, error: err instanceof AiError ? err.message : 'Erro inesperado na IA. Veja o log.' }
+    }
+  }
+  ipcMain.handle('ai:getSettings',  () => getPublicSettings())
+  ipcMain.handle('ai:saveSettings', (_e, input: SaveSettingsInput) => aiCall(() => saveSettings(input))())
+  ipcMain.handle('ai:listModels',   () => aiCall(async () => {
+    const cfg = getActiveConfig()
+    if (!cfg) throw new AiError('Salve uma chave de API primeiro.')
+    return listModels(cfg)
+  })())
+  ipcMain.handle('ai:getProfile',      () => getProfile())
+  ipcMain.handle('ai:generateProfile', () => aiCall(() => generateProfile())())
+  ipcMain.handle('ai:saveProfile',     (_e, text: string) => aiCall(() => saveProfileText(text))())
+  ipcMain.handle('ai:recommend',       (_e, req: RecommendRequest) => aiCall(() => recommend(req))())
+  ipcMain.handle('ai:lastRecommendations', () => getLastRecommendations())
+  ipcMain.handle('ai:feedback', (_e, tmdbId: number, tipo: 'filme' | 'serie', title: string, year: string | null, verdict: Verdict | null) =>
+    aiCall(() => setFeedback(tmdbId, tipo, title, year, verdict))())
+  ipcMain.handle('ai:addToWatchlist', (_e, tmdbId: number, tipo: 'filme' | 'serie') =>
+    aiCall(() => addSuggestionToWatchlist(tmdbId, tipo))())
 
   // Watchlist
   ipcMain.handle('watchlist:getAll', () => getAllWatchlist())
@@ -264,6 +298,11 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  })
+  // Links com target=_blank (ex.: "pegar chave de API") abrem no navegador padrão.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) shell.openExternal(url)
+    return { action: 'deny' }
   })
   if (isDev) {
     win.loadURL('http://localhost:5173')

@@ -80,3 +80,38 @@ export function getBackdropUrl(backdropPath: string, size: 'w780' | 'w1280' | 'o
   if (!backdropPath) return ''
   return `${IMG_URL}${size}${backdropPath}`
 }
+
+export interface TmdbMatchCandidate {
+  id:            number
+  title:         string
+  originalTitle: string
+  year:          string
+  voteCount:     number
+}
+
+/**
+ * Busca crua para conferir títulos sugeridos pela IA: traz título original,
+ * ano e popularidade para escolher o candidato certo (e descartar invenções).
+ */
+export async function searchForMatch(
+  query: string,
+  tipo: 'filme' | 'serie',
+  year?: number,
+): Promise<TmdbMatchCandidate[]> {
+  if (!API_KEY || !query.trim()) return []
+  const kind    = tipo === 'filme' ? 'movie' : 'tv'
+  const yearKey = tipo === 'filme' ? 'year' : 'first_air_date_year'
+  const url = `${BASE_URL}/search/${kind}?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR`
+    + (year ? `&${yearKey}=${year}` : '')
+  const data = await fetchJson<{ results: {
+    id: number; title?: string; name?: string; original_title?: string; original_name?: string
+    release_date?: string; first_air_date?: string; vote_count?: number
+  }[] }>(url)
+  return (data.results ?? []).slice(0, 8).map(r => ({
+    id:            r.id,
+    title:         r.title ?? r.name ?? '',
+    originalTitle: r.original_title ?? r.original_name ?? '',
+    year:          (r.release_date ?? r.first_air_date ?? '').slice(0, 4),
+    voteCount:     r.vote_count ?? 0,
+  }))
+}

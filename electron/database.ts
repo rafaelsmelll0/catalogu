@@ -124,6 +124,27 @@ function initSchema(db: Database.Database) {
     );
   `)
 
+  // IA: chave/valor para dados pequenos (perfil de gosto, últimas sugestões) e
+  // o que o usuário respondeu às sugestões (para não repetir e para aprender).
+  // Ficam no banco para irem junto no backup.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_kv (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_feedback (
+      tmdb_id    INTEGER NOT NULL,
+      tipo       TEXT NOT NULL CHECK(tipo IN ('filme','serie')),
+      title      TEXT NOT NULL,
+      year       TEXT,
+      verdict    TEXT NOT NULL CHECK(verdict IN ('added','seen','dismissed')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (tmdb_id, tipo)
+    );
+  `)
+
   // Migration: adicionar backdrop_path se não existir
   try {
     db.prepare('SELECT backdrop_path FROM media LIMIT 1').get()
