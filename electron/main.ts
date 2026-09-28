@@ -24,8 +24,8 @@ import { getPublicSettings, saveSettings, getActiveConfig, type SaveSettingsInpu
 import { listModels, AiError } from './aiClient.js'
 import {
   getProfile, generateProfile, saveProfileText,
-  recommend, getLastRecommendations, setFeedback, addSuggestionToWatchlist,
-  type Verdict,
+  recommend, getLastRecommendations, setFeedback, addSuggestionToWatchlist, addSuggestionToCatalog,
+  type Verdict, type WatchedFields,
 } from './aiService.js'
 import type { RecommendRequest } from './aiPrompts.js'
 import { updateAllImages, type ImageUpdateProgress, type ImageUpdateResult } from './updateImages.js'
@@ -104,6 +104,8 @@ function registerIpcHandlers() {
     aiCall(() => setFeedback(tmdbId, tipo, title, year, verdict))())
   ipcMain.handle('ai:addToWatchlist', (_e, tmdbId: number, tipo: 'filme' | 'serie') =>
     aiCall(() => addSuggestionToWatchlist(tmdbId, tipo))())
+  ipcMain.handle('ai:addToCatalog', (_e, tmdbId: number, tipo: 'filme' | 'serie', fields: WatchedFields) =>
+    aiCall(() => addSuggestionToCatalog(tmdbId, tipo, fields))())
 
   // Watchlist
   ipcMain.handle('watchlist:getAll', () => getAllWatchlist())

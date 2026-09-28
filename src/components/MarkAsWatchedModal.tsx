@@ -17,13 +17,27 @@ const STATUS_OPTIONS: SelectOption<Status>[] = [
   { value: 'nao_lembro',    label: 'Não lembro',      color: '#F5A623' },
 ]
 
-interface Props {
-  item:    WatchlistItem
-  onClose: () => void
-  onDone:  () => void
+export interface WatchedFields {
+  watched_status: Status
+  rating?:        number
+  observations?:  string
+  watched_date?:  string
 }
 
-export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
+type Props = {
+  onClose: () => void
+  onDone:  () => void
+} & (
+  /** Item de Próximos: salvar promove o item para o catálogo. */
+  | { item: WatchlistItem; onSave?: undefined }
+  /**
+   * Qualquer outro título (ex.: sugestão da IA): quem chama faz o cadastro.
+   * onSave devolve uma mensagem de erro para manter a janela aberta, ou null.
+   */
+  | { item: Pick<WatchlistItem, 'title' | 'tipo' | 'release_year' | 'cover_path'>; onSave: (f: WatchedFields) => Promise<string | null> }
+)
+
+export function MarkAsWatchedModal({ item, onClose, onDone, onSave }: Props) {
   const fetchMedia     = useMediaStore(s => s.fetchAll)
   const fetchWatchlist = useWatchlistStore(s => s.fetchAll)
   const [rating, setRating]             = useState(0)
@@ -35,20 +49,34 @@ export function MarkAsWatchedModal({ item, onClose, onDone }: Props) {
   async function handleSave() {
     setSaving(true)
     try {
+      if (onSave) {
+        const error = await onSave({
+          watched_status: status,
+          rating:         rating > 0 ? rating : undefined,
+          observations:   observations.trim() || undefined,
+          watched_date:   status === 'assistido' && watchedDate ? watchedDate : undefined,
+        })
+        if (error) { showToast(error, 'error'); return }
+        await Promise.all([fetchMedia(), fetchWatchlist()])
+        showToast(`"${item.title}" adicionado ao catálogo!`)
+        onDone()
+        return
+      }
+      const w = item as WatchlistItem
       // Promoção atômica no backend: cria a mídia, preserva os vínculos com listas
       // e remove o item de Próximos numa única transação.
-      await ipc<number>('watchlist:promote', item.id, {
-        title:          item.title,
-        tipo:           item.tipo,
-        release_year:   item.release_year,
-        synopsis:       item.synopsis,
-        cover_path:     item.cover_path,
-        backdrop_path:  item.backdrop_path,
-        duration:       item.duration,
-        director:       item.director,
-        genres:         item.genres,
-        cast:           item.cast,
-        tmdb_id:        item.tmdb_id,
+      await ipc<number>('watchlist:promote', w.id, {
+        title:          w.title,
+        tipo:           w.tipo,
+        release_year:   w.release_year,
+        synopsis:       w.synopsis,
+        cover_path:     w.cover_path,
+        backdrop_path:  w.backdrop_path,
+        duration:       w.duration,
+        director:       w.director,
+        genres:         w.genres,
+        cast:           w.cast,
+        tmdb_id:        w.tmdb_id,
         watched_status: status,
         rating:         rating > 0 ? rating : undefined,
         observations:   observations.trim() || undefined,

@@ -4,10 +4,11 @@ import { theme } from '../styles/theme.ts'
 import { ipc } from '../lib/ipc.ts'
 import { formatDateBR } from '../lib/date.ts'
 import type {
-  AiResult, AiSettings, RecommendRequest, RecommendResult, Suggestion, SuggestionVerdict, TasteProfile,
+  AiResult, AiSettings, RecommendRequest, RecommendResult, Suggestion, SuggestionStatus, SuggestionVerdict, TasteProfile,
 } from '../types/index.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { Button, Input, Textarea, Badge } from '../components/ui/index.ts'
+import { MarkAsWatchedModal, type WatchedFields } from '../components/MarkAsWatchedModal.tsx'
 import { showToast } from '../components/Toast.tsx'
 import CatSit from '../assets/cat-sit.svg?react'
 
@@ -51,6 +52,7 @@ export function ParaVocePage() {
   const [loading, setLoading]             = useState<LoadingKind | null>(null)
   const [error, setError]                 = useState<string | null>(null)
   const [elapsed, setElapsed]             = useState(0)
+  const [watchedFor, setWatchedFor]       = useState<Suggestion | null>(null)
 
   useEffect(() => {
     ipc<AiSettings>('ai:getSettings').then(setSettings)
@@ -117,6 +119,14 @@ export function ParaVocePage() {
     fetchWatchlist()
   }
 
+  /** "Já vi": a janela de nota/opinião chama isto ao salvar; erro mantém a janela aberta. */
+  async function handleAddToCatalog(s: Suggestion, fields: WatchedFields): Promise<string | null> {
+    const res = await ipc<AiResult<{ mediaId: number }>>('ai:addToCatalog', s.tmdbId, s.tipo, fields)
+    if (!res.ok) return res.error
+    updateItem(s.tmdbId, { status: 'cataloged' })
+    return null
+  }
+
   async function handleVerdict(s: Suggestion, verdict: SuggestionVerdict | null) {
     updateItem(s.tmdbId, { status: verdict ?? undefined })
     const res = await ipc<AiResult<void>>('ai:feedback', s.tmdbId, s.tipo, s.title, s.year || null, verdict)
@@ -172,6 +182,7 @@ export function ParaVocePage() {
             <Results
               result={result}
               onAdd={handleAddToWatchlist}
+              onWatched={setWatchedFor}
               onVerdict={handleVerdict}
               onOpenProximos={() => navigate('/proximos')}
             />
@@ -183,6 +194,20 @@ export function ParaVocePage() {
             </div>
           )}
         </>
+      )}
+
+      {watchedFor && (
+        <MarkAsWatchedModal
+          item={{
+            title:        watchedFor.title,
+            tipo:         watchedFor.tipo,
+            release_year: watchedFor.year,
+            cover_path:   watchedFor.posterUrl ?? undefined,
+          }}
+          onSave={f => handleAddToCatalog(watchedFor, f)}
+          onClose={() => setWatchedFor(null)}
+          onDone={() => setWatchedFor(null)}
+        />
       )}
     </div>
   )
@@ -438,9 +463,10 @@ function LoadingState({ kind, elapsed, thinking }: { kind: LoadingKind; elapsed:
 
 // ─── Resultados ─────────────────────────────────────────────────────────────
 
-function Results({ result, onAdd, onVerdict, onOpenProximos }: {
+function Results({ result, onAdd, onWatched, onVerdict, onOpenProximos }: {
   result: RecommendResult
   onAdd: (s: Suggestion) => void
+  onWatched: (s: Suggestion) => void
   onVerdict: (s: Suggestion, v: SuggestionVerdict | null) => void
   onOpenProximos: () => void
 }) {
@@ -466,6 +492,7 @@ function Results({ result, onAdd, onVerdict, onOpenProximos }: {
             s={s}
             index={i}
             onAdd={() => onAdd(s)}
+            onWatched={() => onWatched(s)}
             onVerdict={v => onVerdict(s, v)}
             onOpenProximos={onOpenProximos}
           />
@@ -475,16 +502,18 @@ function Results({ result, onAdd, onVerdict, onOpenProximos }: {
   )
 }
 
-const VERDICT_LABEL: Record<SuggestionVerdict, string> = {
+const STATUS_LABEL: Record<SuggestionStatus, string> = {
   added:     '✓ Em Próximos',
+  cataloged: '✓ No catálogo',
   seen:      '👁 Você já viu',
   dismissed: '✕ Descartada',
 }
 
-function SuggestionCard({ s, index, onAdd, onVerdict, onOpenProximos }: {
+function SuggestionCard({ s, index, onAdd, onWatched, onVerdict, onOpenProximos }: {
   s: Suggestion
   index: number
   onAdd: () => void
+  onWatched: () => void
   onVerdict: (v: SuggestionVerdict | null) => void
   onOpenProximos: () => void
 }) {
@@ -573,18 +602,19 @@ function SuggestionCard({ s, index, onAdd, onVerdict, onOpenProximos }: {
             <>
               <span style={{
                 fontSize: theme.fontSizes.small, fontWeight: theme.fontWeights.bold,
-                color: s.status === 'added' ? theme.colors.success : theme.colors.textMuted,
+                color: s.status === 'added' || s.status === 'cataloged' ? theme.colors.success : theme.colors.textMuted,
               }}>
-                {VERDICT_LABEL[s.status!]}
+                {STATUS_LABEL[s.status!]}
               </span>
-              {s.status === 'added'
-                ? <Button size="sm" variant="ghost" onClick={onOpenProximos}>Ver em Próximos</Button>
-                : <Button size="sm" variant="ghost" onClick={() => onVerdict(null)}>Desfazer</Button>}
+              {s.status === 'added' && <Button size="sm" variant="ghost" onClick={onOpenProximos}>Ver em Próximos</Button>}
+              {(s.status === 'seen' || s.status === 'dismissed') && (
+                <Button size="sm" variant="ghost" onClick={() => onVerdict(null)}>Desfazer</Button>
+              )}
             </>
           ) : (
             <>
               <Button size="sm" onClick={onAdd}>+ Próximos</Button>
-              <Button size="sm" variant="ghost" onClick={() => onVerdict('seen')}>Já vi</Button>
+              <Button size="sm" variant="ghost" onClick={onWatched}>Já vi</Button>
               <Button size="sm" variant="ghost" onClick={() => onVerdict('dismissed')}>Não curti</Button>
             </>
           )}

@@ -1,6 +1,6 @@
 import { getDatabase } from './database.js'
-import { getAllMedia } from './queries.js'
-import { getAllWatchlist, addToWatchlist, findDuplicateInWatchlist } from './watchlistQueries.js'
+import { getAllMedia, addMedia, type AddMediaInput } from './queries.js'
+import { getAllWatchlist, addToWatchlist, findDuplicateInWatchlist, promoteToMedia } from './watchlistQueries.js'
 import { findDuplicateInMedia } from './queries.js'
 import { getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl, searchForMatch, type TmdbMatchCandidate } from './tmdb.js'
 import { titlesMatch, pickCandidate } from './aiMatch.js'
@@ -31,6 +31,8 @@ const KV_PROFILE   = 'ai.profile'
 const KV_LAST_RECS = 'ai.lastRecs'
 
 export type Verdict = 'added' | 'seen' | 'dismissed'
+/** Estado do card: além das respostas, 'cataloged' = entrou no catálogo pelo "Já vi". */
+export type SuggestionStatus = Verdict | 'cataloged'
 
 function loadFeedback(): (FeedbackEntry & { tmdb_id: number })[] {
   return getDatabase().prepare('SELECT tmdb_id, tipo, title, year, verdict FROM ai_feedback ORDER BY created_at').all() as
@@ -151,7 +153,7 @@ export interface Suggestion {
   why:           string
   similarTo:     string[]
   warning:       string | null
-  status?:       Verdict
+  status?:       SuggestionStatus
 }
 
 export interface RecommendResult {
@@ -167,7 +169,7 @@ export function getLastRecommendations(): RecommendResult | null {
   return kvGet<RecommendResult>(KV_LAST_RECS)
 }
 
-function updateStoredStatus(tmdbId: number, tipo: 'filme' | 'serie', status: Verdict | undefined) {
+function updateStoredStatus(tmdbId: number, tipo: 'filme' | 'serie', status: SuggestionStatus | undefined) {
   const last = kvGet<RecommendResult>(KV_LAST_RECS)
   if (!last) return
   const item = last.items.find(i => i.tmdbId === tmdbId && i.tipo === tipo)
@@ -322,4 +324,53 @@ export async function addSuggestionToWatchlist(tmdbId: number, tipo: 'filme' | '
   }
   setFeedback(tmdbId, tipo, d.title, d.year || null, 'added')
   return { success: true }
+}
+
+export interface WatchedFields {
+  watched_status: NonNullable<AddMediaInput['watched_status']>
+  rating?:        number
+  observations?:  string
+  watched_date?:  string
+}
+
+/**
+ * "Já vi" numa sugestão: cadastra no catálogo com a nota/opinião do usuário e os
+ * dados completos do TMDB. Se o título estiver em Próximos, promove (mantém os
+ * vínculos com listas e as imagens já salvas).
+ */
+export async function addSuggestionToCatalog(tmdbId: number, tipo: 'filme' | 'serie', fields: WatchedFields): Promise<{ mediaId: number }> {
+  const d = await loadDetails(tmdbId, tipo)
+  if (findDuplicateInMedia(tmdbId, d.title, d.year || undefined, tipo)) {
+    updateStoredStatus(tmdbId, tipo, 'cataloged')
+    throw new AiError(`"${d.title}" já está no seu catálogo.`)
+  }
+
+  const inWatchlist = findDuplicateInWatchlist(tmdbId, d.title, d.year || undefined, tipo)
+  const images = inWatchlist
+    ? { cover_path: inWatchlist.cover_path, backdrop_path: inWatchlist.backdrop_path }
+    : await localizeMediaImages({ cover_path: d.posterUrl ?? undefined, backdrop_path: d.backdropUrl ?? undefined })
+
+  const media: AddMediaInput = {
+    title:          d.title,
+    tipo,
+    release_year:   d.year || undefined,
+    synopsis:       d.overview || undefined,
+    cover_path:     images.cover_path ?? undefined,
+    backdrop_path:  images.backdrop_path ?? undefined,
+    duration:       d.duration ?? undefined,
+    director:       d.director ?? undefined,
+    genres:         d.genres,
+    cast:           d.cast,
+    tmdb_id:        tmdbId,
+    watched_status: fields.watched_status,
+    rating:         fields.rating && fields.rating > 0 ? fields.rating : undefined,
+    observations:   fields.observations?.trim() || undefined,
+    watched_date:   fields.watched_status === 'assistido' ? fields.watched_date : undefined,
+  }
+  const mediaId = inWatchlist ? promoteToMedia(inWatchlist.id, media) : addMedia(media)
+
+  // Agora está no catálogo (que já entra no prompt): a resposta antiga, se houver, sobra.
+  getDatabase().prepare('DELETE FROM ai_feedback WHERE tmdb_id = ? AND tipo = ?').run(tmdbId, tipo)
+  updateStoredStatus(tmdbId, tipo, 'cataloged')
+  return { mediaId }
 }

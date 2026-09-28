@@ -118,6 +118,8 @@ export interface TasteProfile {
 }
 
 export type SuggestionVerdict = 'added' | 'seen' | 'dismissed'
+/** Estado do card; 'cataloged' = entrou no catálogo pelo "Já vi". */
+export type SuggestionStatus = SuggestionVerdict | 'cataloged'
 
 export interface Suggestion {
   tmdbId:        number
@@ -135,7 +137,7 @@ export interface Suggestion {
   why:           string
   similarTo:     string[]
   warning:       string | null
-  status?:       SuggestionVerdict
+  status?:       SuggestionStatus
 }
 
 export interface RecommendRequest {
