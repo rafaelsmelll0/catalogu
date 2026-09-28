@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
@@ -101,6 +101,24 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
   const [bulkDone, setBulkDone]         = useState(false)
   const [bulkLog, setBulkLog]           = useState<{ title: string; status: 'added' | 'dup_watchlist' | 'dup_catalog' | 'error' }[]>([])
 
+  // Atalhos na escolha do tipo: 1 = Filme, 2 = Série, 3 = Manual
+  useEffect(() => {
+    if (step !== 'tipo') return
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.altKey || e.metaKey) return
+      if (e.key === '1' || e.key === '2') {
+        e.preventDefault()
+        setTipo(e.key === '1' ? 'filme' : 'serie')
+        setStep('busca')
+      } else if (e.key === '3') {
+        e.preventDefault()
+        setStep('form')
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [step])
+
   async function handleSearch() {
     if (!query.trim()) return
     setSearching(true)
@@ -170,22 +188,7 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
       const title       = details.title ?? details.name ?? ''
       const releaseYear = (details.release_date ?? details.first_air_date ?? '').slice(0, 4) || undefined
 
-      let detectedConflict: ConflictState | null = null
-      if (mode === 'catalog') {
-        const inCatalog = await window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear) as Media | null
-        if (inCatalog) detectedConflict = { type: 'duplicate_catalog', mediaItem: inCatalog }
-        else {
-          const inWatchlist = await window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear) as WatchlistItem | null
-          if (inWatchlist) detectedConflict = { type: 'in_watchlist', watchlistItem: inWatchlist }
-        }
-      } else {
-        const inWatchlist = await window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear) as WatchlistItem | null
-        if (inWatchlist) detectedConflict = { type: 'duplicate_watchlist', watchlistItem: inWatchlist }
-        else {
-          const inCatalog = await window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear) as Media | null
-          if (inCatalog) detectedConflict = { type: 'in_catalog', mediaItem: inCatalog }
-        }
-      }
+      const detectedConflict = await detectConflict(tmdbId, title, releaseYear, tipo)
 
       if (detectedConflict) {
         setConflict(detectedConflict)
@@ -199,11 +202,37 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
     }
   }
 
+  /** Procura o título no catálogo e em Próximos; a ordem depende de onde se está adicionando. */
+  async function detectConflict(
+    tmdbId: number | null, title: string, releaseYear: string | undefined, t: TipoMidia,
+  ): Promise<ConflictState | null> {
+    const findCatalog   = () => window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear, t) as Promise<Media | null>
+    const findWatchlist = () => window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear, t) as Promise<WatchlistItem | null>
+
+    if (mode === 'catalog') {
+      const inCatalog = await findCatalog()
+      if (inCatalog) return { type: 'duplicate_catalog', mediaItem: inCatalog }
+      const inWatchlist = await findWatchlist()
+      if (inWatchlist) return { type: 'in_watchlist', watchlistItem: inWatchlist }
+    } else {
+      const inWatchlist = await findWatchlist()
+      if (inWatchlist) return { type: 'duplicate_watchlist', watchlistItem: inWatchlist }
+      const inCatalog = await findCatalog()
+      if (inCatalog) return { type: 'in_catalog', mediaItem: inCatalog }
+    }
+    return null
+  }
+
   async function handleSave() {
     if (!form.title.trim()) { setError('Título é obrigatório.'); return }
     setSaving(true)
     setError(null)
     try {
+      // Cadastro manual não passou pela checagem da busca: confere título + ano aqui.
+      if (!form.tmdb_id) {
+        const found = await detectConflict(null, form.title.trim(), form.release_year || undefined, form.tipo)
+        if (found) { setConflict(found); setSaving(false); return }
+      }
       await doSave()
     } catch {
       setError('Erro ao salvar.')
@@ -273,8 +302,8 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
         const tmdbId      = details.id
         const title       = details.title ?? details.name ?? ''
         const releaseYear = (details.release_date ?? details.first_air_date ?? '').slice(0, 4) || undefined
-        const inWatchlist = await window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear)
-        const inCatalog   = await window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear)
+        const inWatchlist = await window.electronAPI.invoke('watchlist:findDuplicate', tmdbId, title, releaseYear, tipo)
+        const inCatalog   = await window.electronAPI.invoke('media:findDuplicate', tmdbId, title, releaseYear, tipo)
 
         if (inWatchlist) {
           setBulkLog(prev => [...prev, { title, status: 'dup_watchlist' }])
@@ -318,7 +347,7 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
 
   const titleByStep: Record<Step, string> = {
     tipo:    mode === 'watchlist' ? 'Adicionar a Próximos' : 'Adicionar Mídia',
-    busca:   `Buscar ${tipo}`,
+    busca:   tipo === 'filme' ? 'Buscar filme' : 'Buscar série',
     selecao: 'Selecionar resultado',
     form:    form.title || 'Preencher dados',
   }
@@ -364,7 +393,7 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
                 Que tipo de mídia deseja adicionar?
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
-                {TIPO_OPTIONS.map(t => (
+                {TIPO_OPTIONS.map((t, i) => (
                   <button
                     key={t.value}
                     onClick={() => { setTipo(t.value); setStep('busca') }}
@@ -391,9 +420,10 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
                     }}
                   >
                     <Badge customColor={t.color} size="md">{t.label}</Badge>
-                    <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.ui }}>
+                    <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.ui, flex: 1 }}>
                       Busca no TMDB
                     </span>
+                    <KeyHint k={String(i + 1)} />
                   </button>
                 ))}
                 <button
@@ -408,11 +438,13 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
                     padding: theme.spacing.md,
                     cursor: 'pointer', textAlign: 'left',
                     transition: `all ${theme.transitions.fast}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = theme.colors.textPrimary }}
                   onMouseLeave={e => { e.currentTarget.style.color = theme.colors.textMuted }}
                 >
                   ✏ Adicionar manualmente (sem busca)
+                  <KeyHint k="3" />
                 </button>
               </div>
             </div>
@@ -797,5 +829,22 @@ export function AddMediaModal({ onClose, mode = 'catalog' }: Props) {
         </div>
       </Modal>
     </>
+  )
+}
+
+function KeyHint({ k }: { k: string }) {
+  return (
+    <kbd style={{
+      background: theme.colors.surfaceElevated,
+      border: `1px solid ${theme.colors.surfaceHover}`,
+      borderRadius: theme.radius.sm,
+      padding: '1px 7px',
+      fontSize: theme.fontSizes.tiny,
+      fontFamily: theme.fonts.mono,
+      color: theme.colors.textMuted,
+      boxShadow: `0 2px 0 ${theme.colors.surfaceHover}`,
+    }}>
+      {k}
+    </kbd>
   )
 }

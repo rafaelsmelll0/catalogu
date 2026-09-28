@@ -1,5 +1,6 @@
-import { ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { theme } from '../../styles/theme.ts'
+import { useEscapeLayer } from '../../hooks/useEscapeLayer.ts'
 
 interface Props {
   open:             boolean
@@ -14,18 +15,14 @@ interface Props {
 export function Modal({
   open, onClose, title, children, width = '520px', closeOnBackdrop = true, hideHeader = false,
 }: Props) {
+  // Esc fecha só o modal do topo (ver useEscapeLayer)
+  useEscapeLayer(open, onClose)
+
   useEffect(() => {
     if (!open) return
-    function esc(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', esc)
     document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', esc)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
+    return () => { document.body.style.overflow = '' }
+  }, [open])
 
   if (!open) return null
 

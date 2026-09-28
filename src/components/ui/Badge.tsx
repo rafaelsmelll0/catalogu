@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 type Variant = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'muted'

@@ -77,9 +77,22 @@ export function ListasPage() {
     await loadListMedia(list.id)
   }
 
+  /** Nome já usado por outra lista? (o banco exige nome único e falharia sem avisar) */
+  function nameTaken(name: string, exceptId?: number) {
+    const n = normalize(name.trim())
+    return lists.some(l => l.id !== exceptId && normalize(l.name) === n)
+  }
+
   async function handleCreate() {
     if (!newName.trim()) return
-    await window.electronAPI.invoke('lists:create', newName.trim(), newDesc.trim())
+    if (nameTaken(newName)) { showToast(`Já existe uma lista chamada "${newName.trim()}".`, 'error'); return }
+    try {
+      await window.electronAPI.invoke('lists:create', newName.trim(), newDesc.trim())
+    } catch (err) {
+      console.error('[ListasPage.handleCreate]', err)
+      showToast('Não foi possível criar a lista.', 'error')
+      return
+    }
     showToast(`Lista "${newName}" criada!`)
     setNewName(''); setNewDesc(''); setShowCreate(false)
     await loadLists()
@@ -87,7 +100,14 @@ export function ListasPage() {
 
   async function handleUpdate() {
     if (!selected || !newName.trim()) return
-    await window.electronAPI.invoke('lists:update', selected.id, newName.trim(), newDesc.trim())
+    if (nameTaken(newName, selected.id)) { showToast(`Já existe uma lista chamada "${newName.trim()}".`, 'error'); return }
+    try {
+      await window.electronAPI.invoke('lists:update', selected.id, newName.trim(), newDesc.trim())
+    } catch (err) {
+      console.error('[ListasPage.handleUpdate]', err)
+      showToast('Não foi possível salvar a lista.', 'error')
+      return
+    }
     showToast('Lista atualizada!')
     setEditMode(false)
     await loadLists()

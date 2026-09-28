@@ -1,4 +1,4 @@
-import { ReactNode, useState, useRef, useEffect } from 'react'
+import { type ReactNode, useState, useRef, useEffect } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 interface Props {

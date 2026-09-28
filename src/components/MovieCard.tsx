@@ -25,7 +25,7 @@ function MovieCardInner({ media, onClick, index = 0 }: Props) {
 
   const isUnseen   = (media.watched_status === 'nao_assistido' || media.watched_status === 'nao_lembro') && !(media as any).isProximo
   const isWatching = media.watched_status === 'assistindo'
-  const gradient   = POSTER_GRADIENTS[media.id % POSTER_GRADIENTS.length]
+  const gradient   = POSTER_GRADIENTS[Math.abs(media.id) % POSTER_GRADIENTS.length]
 
   const ratingColor = !media.rating     ? theme.colors.textMuted
     : media.rating >= 8                 ? theme.colors.success
@@ -163,7 +163,7 @@ function MovieCardInner({ media, onClick, index = 0 }: Props) {
             )}
 
             {/* Duração */}
-            {media.duration && (
+            {!!media.duration && media.duration > 0 && (
               <div style={{
                 fontSize: theme.fontSizes.tiny,
                 color: 'rgba(255,255,255,0.55)',
@@ -220,10 +220,10 @@ function MovieCardInner({ media, onClick, index = 0 }: Props) {
   )
 }
 
+// O store troca os objetos a cada fetch, então comparar a referência de media
+// basta para re-renderizar após qualquer edição (título, ano, gêneros...).
 export const MovieCard = memo(MovieCardInner, (prev, next) =>
-  prev.media.id             === next.media.id &&
-  prev.media.watched_status === next.media.watched_status &&
-  prev.media.rating         === next.media.rating &&
-  prev.media.cover_path     === next.media.cover_path &&
-  prev.index                === next.index
+  prev.media   === next.media &&
+  prev.onClick === next.onClick &&
+  prev.index   === next.index
 )

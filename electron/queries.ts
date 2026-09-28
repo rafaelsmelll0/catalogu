@@ -123,6 +123,13 @@ export function getMediaById(id: number): MediaRow | null {
 
 export function addMedia(input: AddMediaInput): number {
   const db = getDatabase()
+  // Transação: a mídia e seus vínculos (gêneros, pessoas, tags) entram juntos ou nada entra.
+  // Dentro de outra transação (ex.: promoteToMedia) o better-sqlite3 usa savepoint.
+  return db.transaction(() => insertMedia(input))()
+}
+
+function insertMedia(input: AddMediaInput): number {
+  const db = getDatabase()
 
   const { genres = [], tags = [], director, cast = [], ...mediaFields } = input
 
@@ -164,45 +171,80 @@ export function addMedia(input: AddMediaInput): number {
   return mediaId
 }
 
+/** Colunas de media que o renderer pode alterar via updateMedia. */
+const UPDATABLE_COLUMNS = new Set([
+  'title', 'release_year', 'synopsis', 'observations', 'rating', 'duration', 'watched',
+  'cover_path', 'cover_path_thumb', 'backdrop_path', 'tipo', 'watched_status',
+  'tmdb_id', 'watched_date',
+])
+
 export function updateMedia(id: number, input: Partial<AddMediaInput>): boolean {
   const db = getDatabase()
-  const { genres, tags, director, cast, ...fields } = input
+  const { genres, tags, director, cast, ...rest } = input
 
+  // Só aceita colunas conhecidas: os nomes viram SQL, então nada vindo de fora entra cru.
+  const fields = Object.fromEntries(
+    Object.entries(rest).filter(([k]) => UPDATABLE_COLUMNS.has(k)),
+  )
   const setClauses = Object.keys(fields)
     .map(k => `${k} = @${k}`)
     .join(', ')
 
-  if (setClauses) {
-    db.prepare(`UPDATE media SET ${setClauses} WHERE id = @id`)
-      .run({ ...fields, id })
-  }
+  db.transaction(() => {
+    if (setClauses) {
+      db.prepare(`UPDATE media SET ${setClauses} WHERE id = @id`)
+        .run({ ...fields, id })
+    }
 
-  if (genres !== undefined) setGenresForMedia(id, genres)
-  if (tags !== undefined)   setTagsForMedia(id, tags)
-  if (director !== undefined || cast !== undefined) {
-    setPeopleForMedia(id, director, cast ?? [])
-  }
+    if (genres !== undefined) setGenresForMedia(id, genres)
+    if (tags !== undefined)   setTagsForMedia(id, tags)
+    if (director !== undefined || cast !== undefined) {
+      setPeopleForMedia(id, director, cast ?? [])
+    }
+  })()
 
   return true
 }
 
-export function deleteMedia(id: number): boolean {
+/**
+ * Remove a mídia e devolve os caminhos de imagem que ela usava, para o chamador
+ * apagar os arquivos locais (catimg://) que ficariam órfãos.
+ */
+export function deleteMedia(id: number): { cover_path: string | null; backdrop_path: string | null } | null {
   const db = getDatabase()
+  const row = db.prepare('SELECT cover_path, backdrop_path FROM media WHERE id = ?').get(id) as
+    { cover_path: string | null; backdrop_path: string | null } | undefined
   db.prepare('DELETE FROM media WHERE id = ?').run(id)
-  return true
+  return row ?? null
 }
 
-export function findDuplicateInMedia(tmdbId: number | null, title: string, releaseYear?: string): MediaRow | null {
+/**
+ * Procura um título já cadastrado. IDs do TMDB de filme e de série são espaços
+ * distintos (o mesmo número pode ser um filme e uma série), por isso o tipo entra
+ * na comparação quando informado.
+ */
+export function findDuplicateInMedia(
+  tmdbId: number | null,
+  title: string,
+  releaseYear?: string,
+  tipo?: 'filme' | 'serie',
+): MediaRow | null {
   const db = getDatabase()
 
   if (tmdbId) {
-    const row = db.prepare('SELECT * FROM media WHERE tmdb_id = ?').get(tmdbId) as MediaRow | undefined
+    const row = (tipo
+      ? db.prepare('SELECT * FROM media WHERE tmdb_id = ? AND tipo = ?').get(tmdbId, tipo)
+      : db.prepare('SELECT * FROM media WHERE tmdb_id = ?').get(tmdbId)) as MediaRow | undefined
     if (row) return row
   }
 
-  const row = db.prepare(
-    'SELECT * FROM media WHERE LOWER(title) = LOWER(?) AND release_year = ?'
-  ).get(title, releaseYear ?? '') as MediaRow | undefined
+  const row = (tipo
+    ? db.prepare(
+        "SELECT * FROM media WHERE LOWER(title) = LOWER(?) AND COALESCE(release_year, '') = ? AND tipo = ?",
+      ).get(title, releaseYear ?? '', tipo)
+    : db.prepare(
+        "SELECT * FROM media WHERE LOWER(title) = LOWER(?) AND COALESCE(release_year, '') = ?",
+      ).get(title, releaseYear ?? '')) as MediaRow | undefined
 
   return row ?? null
 }
@@ -442,9 +484,10 @@ export function getStats() {
   const total         = (db.prepare('SELECT COUNT(*) as n FROM media').get() as { n: number }).n
   const filmes        = (db.prepare("SELECT COUNT(*) as n FROM media WHERE tipo = 'filme'").get() as { n: number }).n
   const series        = (db.prepare("SELECT COUNT(*) as n FROM media WHERE tipo = 'serie'").get() as { n: number }).n
-const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched_status = 'assistido'").get() as { n: number }).n
+  const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched_status = 'assistido'").get() as { n: number }).n
   const naoAssistidos = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched_status = 'nao_assistido'").get() as { n: number }).n
-  const avgRow        = db.prepare('SELECT AVG(rating) as avg FROM media WHERE rating IS NOT NULL').get() as { avg: number | null }
+  // Nota 0 = "sem nota" (o formulário não salva 0; os não assistidos ficavam com 0 e puxavam a média para baixo)
+  const avgRow        = db.prepare('SELECT AVG(rating) as avg FROM media WHERE rating > 0').get() as { avg: number | null }
 
   let proximos = 0
   try {
@@ -461,11 +504,12 @@ const assistidos    = (db.prepare("SELECT COUNT(*) as n FROM media WHERE watched
     LIMIT 1
   `).get() as { name: string; n: number } | undefined
 
-  // Tempo assistido: soma das durações (minutos) dos títulos assistidos
+  // Tempo assistido: soma das durações (minutos) dos filmes assistidos.
+  // Em séries, duration guarda o número de episódios, então elas ficam de fora.
   const minutos = (db.prepare(`
     SELECT COALESCE(SUM(duration), 0) AS min
     FROM media
-    WHERE watched_status = 'assistido' AND duration IS NOT NULL
+    WHERE watched_status = 'assistido' AND tipo = 'filme' AND duration > 0
   `).get() as { min: number }).min
 
   // Distribuição de notas por estrela (1..5)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { theme } from '../styles/theme.ts'
 import Logo from '../assets/catalogu-logo.svg?react'
@@ -6,6 +6,7 @@ import { useMediaStore } from '../store/mediaStore.ts'
 import { AddMediaModal } from './AddMediaModal.tsx'
 import { Button, Input, Tooltip } from './ui/index.ts'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts.ts'
+import { useEscapeLayer } from '../hooks/useEscapeLayer.ts'
 
 const NAV_LINKS = [
   { label: 'Início',       path: '/' },
@@ -25,10 +26,13 @@ export function TopNav() {
   const [showSearch, setShowSearch] = useState(false)
   const [searchVal, setSearchVal]   = useState('')
 
+  // A busca filtra as grades de Filmes/Séries; de qualquer outra tela, leva para Filmes.
+  const onGridPage = location.pathname === '/filmes' || location.pathname === '/series'
+
   function handleSearch(val: string) {
     setSearchVal(val)
     setFilters({ search: val })
-    if (val && location.pathname === '/') navigate('/filmes')
+    if (val && !onGridPage) navigate('/filmes')
   }
 
   function handleSearchClose() {
@@ -37,10 +41,19 @@ export function TopNav() {
     setFilters({ search: '' })
   }
 
-  useKeyboardShortcuts({
+  // Trocar de página zera os filtros da grade (resetFilters no unmount): reaplica o
+  // texto da busca em Filmes <-> Séries e fecha a busca nas demais telas.
+  useEffect(() => {
+    if (!searchVal) return
+    if (onGridPage) setFilters({ search: searchVal })
+    else handleSearchClose()
+  }, [location.pathname])
+
+  useEscapeLayer(showSearch, handleSearchClose)
+
+  const shortcuts = useMemo(() => ({
     'ctrl+k': () => setShowSearch(true),
     'ctrl+n': () => setShowAdd(true),
-    'escape': () => { if (showSearch) handleSearchClose() },
     'ctrl+1': () => navigate('/'),
     'ctrl+2': () => navigate('/filmes'),
     'ctrl+3': () => navigate('/series'),
@@ -48,7 +61,8 @@ export function TopNav() {
     'ctrl+5': () => navigate('/proximos'),
     'ctrl+6': () => navigate('/stats'),
     'ctrl+7': () => navigate('/config'),
-  })
+  }), [navigate])
+  useKeyboardShortcuts(shortcuts)
 
   return (
     <>
@@ -82,7 +96,6 @@ export function TopNav() {
               placeholder="Buscar no catálogo..."
               value={searchVal}
               onChange={e => handleSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Escape' && handleSearchClose()}
               autoFocus
               style={{ flex: 1 }}
             />

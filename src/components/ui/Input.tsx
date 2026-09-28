@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, useState, ReactNode } from 'react'
+import { type InputHTMLAttributes, useState, type ReactNode } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {

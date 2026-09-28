@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'

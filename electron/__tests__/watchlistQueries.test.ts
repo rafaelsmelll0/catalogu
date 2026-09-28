@@ -142,3 +142,19 @@ describe('getMediaInList — mistura catálogo + Próximos', () => {
     expect(proximo.watchlistId).toBe(wId)
   })
 })
+
+describe('watchlist — correções v3.3.1', () => {
+  it('mesmo tmdb_id como filme e como série não é duplicata', async () => {
+    const { watchlist } = await freshDb()
+    watchlist.addToWatchlist({ ...sampleWatchlist, tmdb_id: 500, tipo: 'filme' })
+
+    expect(() => watchlist.addToWatchlist({ ...sampleWatchlist, title: 'Série X', tmdb_id: 500, tipo: 'serie' })).not.toThrow()
+    expect(watchlist.findDuplicateInWatchlist(500, 'qualquer', undefined, 'serie')!.title).toBe('Série X')
+  })
+
+  it('removeFromWatchlist devolve os caminhos de imagem', async () => {
+    const { watchlist } = await freshDb()
+    const id = watchlist.addToWatchlist({ ...sampleWatchlist, cover_path: 'catimg://p.webp' })
+    expect(watchlist.removeFromWatchlist(id)).toEqual({ cover_path: 'catimg://p.webp', backdrop_path: null })
+  })
+})

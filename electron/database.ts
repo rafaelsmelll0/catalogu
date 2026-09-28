@@ -3,19 +3,28 @@ import Database from 'better-sqlite3'
 let dbPath = ''
 export function setDbPath(p: string) { dbPath = p }
 
-let db: Database.Database
+let db: Database.Database | undefined
 
 export function getDatabase(): Database.Database {
   if (!db) {
     db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')
-    initSchema()
+    initSchema(db)
   }
   return db
 }
 
-function initSchema() {
+/**
+ * Fecha a conexão e esquece o handle, para que o próximo getDatabase() reabra
+ * o arquivo (e rode as migrations). Usado ao substituir o banco por um backup.
+ */
+export function closeDatabase() {
+  if (!db) return
+  try { db.close() } finally { db = undefined }
+}
+
+function initSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS media (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

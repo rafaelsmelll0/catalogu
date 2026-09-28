@@ -54,7 +54,7 @@ export function addToWatchlist(input: AddWatchlistInput): number {
   const db = getDatabase()
 
   if (input.tmdb_id) {
-    const exists = db.prepare('SELECT id FROM watchlist WHERE tmdb_id = ?').get(input.tmdb_id)
+    const exists = db.prepare('SELECT id FROM watchlist WHERE tmdb_id = ? AND tipo = ?').get(input.tmdb_id, input.tipo)
     if (exists) throw new Error('DUPLICATE')
   }
 
@@ -87,23 +87,38 @@ export function addToWatchlist(input: AddWatchlistInput): number {
   return result.lastInsertRowid as number
 }
 
-export function removeFromWatchlist(id: number): boolean {
+/** Remove o item e devolve os caminhos de imagem dele (para apagar arquivos locais órfãos). */
+export function removeFromWatchlist(id: number): { cover_path: string | null; backdrop_path: string | null } | null {
   const db = getDatabase()
+  const row = db.prepare('SELECT cover_path, backdrop_path FROM watchlist WHERE id = ?').get(id) as
+    { cover_path: string | null; backdrop_path: string | null } | undefined
   db.prepare('DELETE FROM watchlist WHERE id = ?').run(id)
-  return true
+  return row ?? null
 }
 
-export function findDuplicateInWatchlist(tmdbId: number | null, title: string, releaseYear?: string): WatchlistRow | null {
+/** Mesma regra de findDuplicateInMedia: o tipo separa IDs de filme e de série no TMDB. */
+export function findDuplicateInWatchlist(
+  tmdbId: number | null,
+  title: string,
+  releaseYear?: string,
+  tipo?: 'filme' | 'serie',
+): WatchlistRow | null {
   const db = getDatabase()
 
   if (tmdbId) {
-    const row = db.prepare('SELECT * FROM watchlist WHERE tmdb_id = ?').get(tmdbId) as WatchlistRowRaw | undefined
+    const row = (tipo
+      ? db.prepare('SELECT * FROM watchlist WHERE tmdb_id = ? AND tipo = ?').get(tmdbId, tipo)
+      : db.prepare('SELECT * FROM watchlist WHERE tmdb_id = ?').get(tmdbId)) as WatchlistRowRaw | undefined
     if (row) return parseRow(row)
   }
 
-  const row = db.prepare(
-    'SELECT * FROM watchlist WHERE LOWER(title) = LOWER(?) AND release_year = ?'
-  ).get(title, releaseYear ?? '') as WatchlistRowRaw | undefined
+  const row = (tipo
+    ? db.prepare(
+        "SELECT * FROM watchlist WHERE LOWER(title) = LOWER(?) AND COALESCE(release_year, '') = ? AND tipo = ?",
+      ).get(title, releaseYear ?? '', tipo)
+    : db.prepare(
+        "SELECT * FROM watchlist WHERE LOWER(title) = LOWER(?) AND COALESCE(release_year, '') = ?",
+      ).get(title, releaseYear ?? '')) as WatchlistRowRaw | undefined
 
   return row ? parseRow(row) : null
 }

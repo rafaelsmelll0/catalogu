@@ -109,3 +109,10 @@ export function deleteLocalImage(p?: string | null) {
     log.error('Falha ao remover imagem local:', p, err)
   }
 }
+
+/** A imagem local catimg:// existe em disco? (backups restaurados em outro PC não trazem os arquivos) */
+export function localImageExists(p?: string | null): boolean {
+  if (!isLocalImage(p)) return false
+  const filename = path.basename(p!.slice(`${SCHEME}://`.length))
+  return fs.existsSync(path.join(getImagesDir(), filename))
+}

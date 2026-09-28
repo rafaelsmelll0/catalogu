@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { Button } from './ui/index.ts'
 
-type UpdateState = 'idle' | 'available' | 'downloading' | 'ready'
+type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'error'
+
+type MainUpdateStatus =
+  | { state: 'idle' }
+  | { state: 'available';   version: string }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'ready';       version: string }
+  | { state: 'error';       message: string }
 
 export function UpdateNotification() {
   const [state, setState]     = useState<UpdateState>('idle')
@@ -10,6 +17,18 @@ export function UpdateNotification() {
   const [percent, setPercent] = useState(0)
 
   useEffect(() => {
+    // Eventos podem ter chegado antes deste componente montar (ex.: download já
+    // concluído): sincroniza com o estado guardado no processo principal.
+    window.electronAPI.invoke('update:getState').then(raw => {
+      const st = raw as MainUpdateStatus
+      if (st.state === 'idle') return
+      if ('version' in st) setVersion(st.version)
+      if (st.state === 'downloading') setPercent(st.percent)
+      setState(st.state)
+    }).catch(() => { /* sem updater em dev */ })
+
+    const unsubError = window.electronAPI.on('update:error', () => setState('error'))
+
     const unsubAvailable = window.electronAPI.on('update:available', (...args) => {
       const { version } = args[0] as { version: string }
       setVersion(version)
@@ -30,6 +49,7 @@ export function UpdateNotification() {
       unsubAvailable()
       unsubProgress()
       unsubDownloaded()
+      unsubError()
     }
   }, [])
 
@@ -96,6 +116,37 @@ export function UpdateNotification() {
           </div>
           <div style={{ fontSize: theme.fontSizes.tiny, color: theme.colors.textMuted }}>
             {percent}%
+          </div>
+        </>
+      )}
+
+      {state === 'error' && (
+        <>
+          <div style={{
+            fontSize: theme.fontSizes.ui,
+            fontWeight: theme.fontWeights.bold,
+            color: theme.colors.textPrimary,
+            marginBottom: theme.spacing.xs,
+          }}>
+            Falha ao baixar a atualização
+          </div>
+          <div style={{
+            fontSize: theme.fontSizes.small,
+            color: theme.colors.textMuted,
+            marginBottom: theme.spacing.md,
+          }}>
+            Verifique sua conexão. O app tenta de novo na próxima abertura.
+          </div>
+          <div style={{ display: 'flex', gap: theme.spacing.xs }}>
+            <Button
+              size="sm"
+              onClick={() => { setState('idle'); window.electronAPI.invoke('update:retry') }}
+            >
+              Tentar de novo
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setState('idle')}>
+              Fechar
+            </Button>
           </div>
         </>
       )}

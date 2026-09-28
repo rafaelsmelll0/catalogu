@@ -78,7 +78,7 @@ function WatchlistCardInner({ item, onWatched, onRemove, index = 0 }: Props) {
               {item.release_year}
             </span>
           )}
-          {item.duration && (
+          {!!item.duration && item.duration > 0 && (
             <span style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
               · {item.tipo === 'filme'
                 ? `${Math.floor(item.duration / 60)}h ${item.duration % 60}min`

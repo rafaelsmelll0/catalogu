@@ -2,13 +2,14 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '../styles/theme.ts'
 import CatSit from '../assets/cat-sit.svg?react'
-import type { Media } from '../types/index.ts'
+import type { Media, WatchlistItem } from '../types/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { HeroBanner } from '../components/HeroBanner.tsx'
 import { LazyMediaRow } from '../components/LazyMediaRow.tsx'
 import { MediaGridSkeleton } from '../components/MediaGridSkeleton.tsx'
 import { DetailsModal } from '../components/DetailsModal.tsx'
+import { WatchlistDetailsModal } from '../components/WatchlistDetailsModal.tsx'
 import { Skeleton } from '../components/ui/index.ts'
 
 function hasAnyGenre(media: Media, genres: string[]): boolean {
@@ -48,6 +49,18 @@ export function HomePage() {
   const { items: watchlistItems, fetchAll: fetchWatchlist } = useWatchlistStore()
   const navigate = useNavigate()
   const [selected, setSelected] = useState<Media | null>(null)
+  const [selectedProximo, setSelectedProximo] = useState<WatchlistItem | null>(null)
+
+  // Cards de Próximos usam id negativo (como em Listas) para nunca colidir com o id
+  // de uma mídia do catálogo; o clique abre os detalhes do item da fila.
+  function handleCardClick(m: Media) {
+    if (m.isProximo) {
+      const w = watchlistItems.find(i => i.id === m.watchlistId)
+      if (w) setSelectedProximo(w)
+    } else {
+      setSelected(m)
+    }
+  }
 
   useEffect(() => { fetchAll(); fetchWatchlist() }, [])
 
@@ -87,11 +100,17 @@ export function HomePage() {
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
 
     const naoAssistidos = items.filter(m => m.watched_status === 'nao_assistido')
-    const proximos      = watchlistItems.slice(0, ROW_LIMIT)
+    const proximos: Media[] = watchlistItems.slice(0, ROW_LIMIT).map(w => ({
+      ...w,
+      id:             -w.id,
+      watched_status: 'nao_assistido',
+      isProximo:      true,
+      watchlistId:    w.id,
+    }))
 
     return [
       { title: 'Adicionados Recentemente',          items: recentes.slice(0, ROW_LIMIT)               },
-      { title: '🎬 Próximos',                        items: proximos as unknown as Media[]             },
+      { title: '🎬 Próximos',                        items: proximos                                   },
       { title: '⭐ Os Melhores',                     items: melhores.slice(0, ROW_LIMIT)               },
       { title: '🎃 Terror',                          items: pickRandomSample(terror, ROW_LIMIT)        },
       { title: '🔪 Suspense',                        items: pickRandomSample(suspense, ROW_LIMIT)      },
@@ -169,12 +188,13 @@ export function HomePage() {
             key={row.title}
             title={row.title}
             items={row.items}
-            onCardClick={setSelected}
+            onCardClick={handleCardClick}
           />
         ))}
       </div>
 
       {selected && <DetailsModal media={selected} onClose={() => setSelected(null)} />}
+      {selectedProximo && <WatchlistDetailsModal item={selectedProximo} onClose={() => setSelectedProximo(null)} />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { TextareaHTMLAttributes, useState } from 'react'
+import { type TextareaHTMLAttributes, useState } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 interface Props extends TextareaHTMLAttributes<HTMLTextAreaElement> {

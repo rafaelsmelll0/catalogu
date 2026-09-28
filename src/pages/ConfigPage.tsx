@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { theme } from '../styles/theme.ts'
 import { Button, Modal } from '../components/ui/index.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
+import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { showToast } from '../components/Toast.tsx'
 
 interface ImageProgress {
@@ -37,12 +38,15 @@ interface ImportV3Result {
   success:   boolean
   imported?: number
   skipped?:  number
+  watchlistImported?: number
+  listsCreated?:      number
   mode?:     'merge' | 'replace'
   error?:    string
 }
 
 export function ConfigPage() {
   const { fetchAll } = useMediaStore()
+  const fetchWatchlist = useWatchlistStore(s => s.fetchAll)
 
   const [updatingImages, setUpdatingImages] = useState(false)
   const [imageProgress, setImageProgress]   = useState<ImageProgress | null>(null)
@@ -69,20 +73,30 @@ export function ConfigPage() {
     return unsub
   }, [])
 
+  // Se a atualização de imagens já estava rodando (saiu e voltou para esta tela),
+  // reconecta a ela em vez de deixar o botão liberado para uma segunda rodada.
+  useEffect(() => {
+    window.electronAPI.invoke('images:isRunning').then(running => {
+      if (running) handleUpdateImages(false)
+    })
+  }, [])
+
   useEffect(() => {
     if (imageLogRef.current) imageLogRef.current.scrollTop = imageLogRef.current.scrollHeight
   }, [imageLog])
 
-  async function handleUpdateImages() {
+  async function handleUpdateImages(resetLog = true) {
     setImageResult(null)
-    setImageLog([])
-    setImageProgress(null)
+    if (resetLog) {
+      setImageLog([])
+      setImageProgress(null)
+    }
     setUpdatingImages(true)
     try {
       const res = await window.electronAPI.invoke('images:updateAll') as ImageResult
       setImageResult(res)
-      await fetchAll()
-      showToast(`${res.updated} imagens atualizadas!`)
+      await Promise.all([fetchAll(), fetchWatchlist()])
+      if (res.updated > 0) showToast(`${res.updated} imagens atualizadas!`)
     } catch {
       showToast('Erro ao atualizar imagens.', 'error')
     } finally {
@@ -112,12 +126,18 @@ export function ConfigPage() {
       const res = await window.electronAPI.invoke('backup:importV3', pendingDbPath, mode) as ImportV3Result
       setImportResult(res)
       if (res.success) {
-        await fetchAll()
+        await Promise.all([fetchAll(), fetchWatchlist()])
         if (mode === 'replace') {
           showToast('Banco substituído com sucesso!')
         } else {
-          showToast(`${res.imported} títulos importados, ${res.skipped} já existiam.`)
+          const extras = [
+            res.watchlistImported ? `${res.watchlistImported} em Próximos` : '',
+            res.listsCreated      ? `${res.listsCreated} listas novas`     : '',
+          ].filter(Boolean).join(', ')
+          showToast(`${res.imported} títulos importados, ${res.skipped} já existiam${extras ? ` (${extras})` : ''}.`)
         }
+        // Backups não carregam os arquivos de imagem: baixa de novo o que faltar.
+        handleUpdateImages()
       } else {
         showToast(`Erro: ${res.error}`, 'error')
       }
@@ -230,7 +250,7 @@ export function ConfigPage() {
         </p>
 
         {!updatingImages && !imageResult && (
-          <Button onClick={handleUpdateImages}>
+          <Button onClick={() => handleUpdateImages()}>
             ↓ Salvar imagens no computador
           </Button>
         )}
@@ -315,6 +335,7 @@ export function ConfigPage() {
         {[
           { keys: ['Ctrl', 'K'],      desc: 'Abrir busca' },
           { keys: ['Ctrl', 'N'],      desc: 'Adicionar mídia' },
+          { keys: ['1 / 2 / 3'],      desc: 'No Adicionar: Filme / Série / Manual' },
           { keys: ['Esc'],            desc: 'Fechar modal / Fechar busca' },
           { keys: ['Ctrl', '1'],      desc: 'Ir para Início' },
           { keys: ['Ctrl', '2'],      desc: 'Ir para Filmes' },

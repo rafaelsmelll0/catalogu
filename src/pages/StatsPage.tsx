@@ -8,6 +8,7 @@ import type { AppStats } from '../types/index.ts'
 import { useCountUp } from '../hooks/useCountUp.ts'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { Skeleton } from '../components/ui/index.ts'
+import { showToast } from '../components/Toast.tsx'
 
 function AnimatedNum({ value, color }: { value: number; color: string }) {
   const animated = useCountUp(value, 1200)
@@ -48,10 +49,13 @@ export function StatsPage() {
 
   useEffect(() => {
     fetchAll()
-    window.electronAPI.invoke('stats:get').then(s => {
-      setStats(s as AppStats)
-      setLoading(false)
-    })
+    window.electronAPI.invoke('stats:get')
+      .then(s => setStats(s as AppStats))
+      .catch(err => {
+        console.error('Erro ao carregar estatísticas:', err)
+        showToast('Não foi possível carregar as estatísticas.', 'error')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) {
@@ -174,7 +178,7 @@ export function StatsPage() {
               <AnimatedNum value={stats.horasAssistidas} color={theme.colors.info} />
               <span style={{ fontSize: '20px', fontWeight: theme.fontWeights.black, color: theme.colors.textMuted }}>h</span>
             </div>
-            <span style={labelStyle}>Tempo assistido</span>
+            <span style={labelStyle}>Tempo em filmes</span>
           </div>
         )}
         {stats.generoFavorito && (
@@ -213,7 +217,7 @@ export function StatsPage() {
                   innerRadius={60} outerRadius={100}
                   paddingAngle={2}
                   stroke="none"
-                  label={(e: { name: string; percent: number }) => `${e.name}: ${(e.percent * 100).toFixed(0)}%`}
+                  label={(e: { name?: string; percent?: number }) => `${e.name ?? ""}: ${((e.percent ?? 0) * 100).toFixed(0)}%`}
                   labelLine={false}
                   style={{ fontSize: '12px', fontWeight: theme.fontWeights.bold }}
                 >

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { theme } from '../../styles/theme.ts'
+import { useEscapeLayer } from '../../hooks/useEscapeLayer.ts'
 
 interface Props {
   allGenres:  string[]
@@ -19,16 +20,11 @@ export function GenreMultiSelect({ allGenres, selected, onChange, label, fullWid
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    function esc(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', handler)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', handler)
-      document.removeEventListener('keydown', esc)
-    }
+    return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  useEscapeLayer(open, () => setOpen(false))
 
   function toggle(genre: string) {
     onChange(selected.includes(genre)

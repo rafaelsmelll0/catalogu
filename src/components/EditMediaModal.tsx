@@ -67,7 +67,11 @@ export function EditMediaModal({ media, onClose, onSaved }: Props) {
         cover_path:     form.cover_path || undefined,
         tipo:           form.tipo,
         watched_status: form.watched_status,
-        watched_date:   form.watched_status === 'assistido' ? (form.watched_date || undefined) : undefined,
+        // Ao passar para "assistido" sem data, assume hoje (como no cadastro); quem já
+        // era assistido mantém o que estiver no campo.
+        watched_date:   form.watched_status === 'assistido'
+          ? (form.watched_date || (media.watched_status !== 'assistido' ? todayLocal() : undefined))
+          : undefined,
         genres:         form.genres ? form.genres.split(',').map(g => g.trim()).filter(Boolean) : [],
         director:       form.director || undefined,
         cast:           form.cast ? form.cast.split(',').map(c => c.trim()).filter(Boolean) : [],

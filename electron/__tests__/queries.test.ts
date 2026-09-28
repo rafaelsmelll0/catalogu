@@ -232,3 +232,59 @@ describe('getStats', () => {
     ])
   })
 })
+
+describe('correções v3.3.1', () => {
+  it('média de nota ignora nota 0 (sem nota) e horas contam só filmes', async () => {
+    const { queries } = await freshDb()
+    queries.addMedia({ ...sampleMovie, title: 'F1', tmdb_id: 1, rating: 8, duration: 120 })
+    queries.addMedia({ ...sampleMovie, title: 'F2', tmdb_id: 2, rating: 0, duration: 100, watched_status: 'nao_assistido' })
+    // série: duration = número de episódios, não minutos
+    queries.addMedia({ ...sampleMovie, title: 'S1', tmdb_id: 3, tipo: 'serie', rating: 6, duration: 62 })
+
+    const stats = queries.getStats()
+    expect(stats.mediaRating).toBe(7) // (8 + 6) / 2 — o 0 fica de fora
+    expect(stats.minutosAssistidos).toBe(120)
+  })
+
+  it('findDuplicateInMedia separa filme e série com o mesmo tmdb_id', async () => {
+    const { queries } = await freshDb()
+    queries.addMedia({ ...sampleMovie, tmdb_id: 1399, tipo: 'filme' })
+
+    expect(queries.findDuplicateInMedia(1399, 'Outra coisa', '2011', 'serie')).toBeNull()
+    expect(queries.findDuplicateInMedia(1399, 'Outra coisa', '2011', 'filme')).not.toBeNull()
+  })
+
+  it('findDuplicateInMedia acha título sem ano (NULL) no cadastro manual', async () => {
+    const { queries } = await freshDb()
+    queries.addMedia({ title: 'Filme Caseiro', tipo: 'filme' })
+
+    expect(queries.findDuplicateInMedia(null, 'filme caseiro', undefined, 'filme')).not.toBeNull()
+  })
+
+  it('updateMedia ignora colunas desconhecidas (nomes viram SQL)', async () => {
+    const { queries } = await freshDb()
+    const id = queries.addMedia(sampleMovie)
+
+    queries.updateMedia(id, { title: 'Novo', ['id = 999; --' as 'title']: 'x' } as never)
+    expect(queries.getMediaById(id)!.title).toBe('Novo')
+  })
+
+  it('updateMedia é atômico: erro no meio não deixa alteração parcial', async () => {
+    const { queries } = await freshDb()
+    const id = queries.addMedia(sampleMovie)
+
+    // o UPDATE do título passa; o gênero nulo falha depois (NOT NULL) e tudo deve voltar
+    expect(() => queries.updateMedia(id, { title: 'Parcial', genres: [null as never] })).toThrow()
+    const row = queries.getMediaById(id)!
+    expect(row.title).toBe('Matrix')
+    expect(row.genres).toEqual(expect.arrayContaining(['Ação', 'Ficção científica']))
+  })
+
+  it('deleteMedia devolve os caminhos de imagem para limpeza', async () => {
+    const { queries } = await freshDb()
+    const id = queries.addMedia({ ...sampleMovie, cover_path: 'catimg://poster_a.webp', backdrop_path: 'catimg://backdrop_a.webp' })
+
+    expect(queries.deleteMedia(id)).toEqual({ cover_path: 'catimg://poster_a.webp', backdrop_path: 'catimg://backdrop_a.webp' })
+    expect(queries.getMediaById(id)).toBeNull()
+  })
+})

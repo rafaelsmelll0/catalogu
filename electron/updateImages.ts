@@ -1,6 +1,6 @@
 import { getDatabase } from './database.js'
 import { getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
-import { localizeRemoteImage, isLocalImage } from './imageStore.js'
+import { localizeRemoteImage, localImageExists } from './imageStore.js'
 
 export interface ImageUpdateProgress {
   current: number
@@ -15,7 +15,8 @@ export interface ImageUpdateResult {
   failed:  number
 }
 
-interface MediaToUpdate {
+interface ItemToUpdate {
+  table:         'media' | 'watchlist'
   id:            number
   title:         string
   tipo:          'filme' | 'serie'
@@ -24,22 +25,26 @@ interface MediaToUpdate {
   backdrop_path: string | null
 }
 
+/**
+ * Garante que capa e fundo de cada título (catálogo e Próximos) sejam webp locais
+ * que existem em disco. Preenche o que falta pelo TMDB, converte URLs remotas e
+ * rebaixa imagens locais cujo arquivo sumiu (ex.: backup restaurado em outro PC).
+ */
 export async function updateAllImages(
   onProgress: (p: ImageUpdateProgress) => void
 ): Promise<ImageUpdateResult> {
   const db = getDatabase()
 
-  // Pega todo mundo que ou tem imagem faltando, ou tem imagem que ainda não é
-  // local (URL do TMDB) — esses são os candidatos a preencher e/ou converter em webp local.
-  const items = db.prepare(`
-    SELECT id, title, tipo, tmdb_id, cover_path, backdrop_path FROM media
-    ORDER BY title
-  `).all() as MediaToUpdate[]
+  const items: ItemToUpdate[] = (['media', 'watchlist'] as const).flatMap(table =>
+    (db.prepare(`
+      SELECT id, title, tipo, tmdb_id, cover_path, backdrop_path FROM ${table}
+      ORDER BY title
+    `).all() as Omit<ItemToUpdate, 'table'>[]).map(row => ({ ...row, table })),
+  )
 
   const result: ImageUpdateResult = { updated: 0, skipped: 0, failed: 0 }
   const candidates = items.filter(it =>
-    !isLocalImage(it.cover_path)    ||
-    !isLocalImage(it.backdrop_path)
+    !localImageExists(it.cover_path) || !localImageExists(it.backdrop_path),
   )
   const total = candidates.length
 
@@ -48,12 +53,15 @@ export async function updateAllImages(
     onProgress({ current: i + 1, total, title: item.title, status: 'updating' })
 
     try {
-      // 1) Descobre as melhores URLs (mantém a local se já for; busca no TMDB se faltar).
-      let coverUrl    = item.cover_path
-      let backdropUrl = item.backdrop_path
+      // 1) Descobre as URLs: local válida fica; remota é convertida; vazia ou
+      //    local quebrada é buscada de novo no TMDB.
+      const coverOk    = localImageExists(item.cover_path)
+      const backdropOk = localImageExists(item.backdrop_path)
+      let coverUrl     = coverOk    ? null : remoteOrNull(item.cover_path)
+      let backdropUrl  = backdropOk ? null : remoteOrNull(item.backdrop_path)
 
-      const needsCover    = !isLocalImage(coverUrl)    && (!coverUrl    || coverUrl.startsWith('http') === false)
-      const needsBackdrop = !isLocalImage(backdropUrl) && (!backdropUrl || backdropUrl.startsWith('http') === false)
+      const needsCover    = !coverOk    && !coverUrl
+      const needsBackdrop = !backdropOk && !backdropUrl
 
       if ((needsCover || needsBackdrop) && item.tmdb_id) {
         const details = item.tipo === 'filme'
@@ -68,22 +76,20 @@ export async function updateAllImages(
       }
 
       // 2) Converte para webp local o que for URL remota.
-      const newCover    = isLocalImage(coverUrl)    ? null : await localizeRemoteImage(coverUrl, 'poster')
-      const newBackdrop = isLocalImage(backdropUrl) ? null : await localizeRemoteImage(backdropUrl, 'backdrop')
+      const newCover    = coverUrl    ? await localizeRemoteImage(coverUrl, 'poster')      : null
+      const newBackdrop = backdropUrl ? await localizeRemoteImage(backdropUrl, 'backdrop') : null
 
       if (!newCover && !newBackdrop) {
-        onProgress({ current: i + 1, total, title: item.title, status: 'no_image' })
+        onProgress({ current: i + 1, total, title: item.title, status: item.tmdb_id ? 'no_image' : 'no_tmdb' })
         result.skipped++
         continue
       }
 
-      if (newCover && newBackdrop) {
-        db.prepare('UPDATE media SET cover_path = ?, backdrop_path = ? WHERE id = ?')
-          .run(newCover, newBackdrop, item.id)
-      } else if (newCover) {
-        db.prepare('UPDATE media SET cover_path = ? WHERE id = ?').run(newCover, item.id)
-      } else if (newBackdrop) {
-        db.prepare('UPDATE media SET backdrop_path = ? WHERE id = ?').run(newBackdrop, item.id)
+      if (newCover) {
+        db.prepare(`UPDATE ${item.table} SET cover_path = ? WHERE id = ?`).run(newCover, item.id)
+      }
+      if (newBackdrop) {
+        db.prepare(`UPDATE ${item.table} SET backdrop_path = ? WHERE id = ?`).run(newBackdrop, item.id)
       }
 
       onProgress({ current: i + 1, total, title: item.title, status: 'updated' })
@@ -97,4 +103,8 @@ export async function updateAllImages(
   }
 
   return result
+}
+
+function remoteOrNull(p: string | null): string | null {
+  return p && p.startsWith('http') ? p : null
 }

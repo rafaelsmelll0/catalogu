@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { theme } from '../../styles/theme.ts'
+import { useEscapeLayer } from '../../hooks/useEscapeLayer.ts'
 
 export interface SelectOption<T = string> {
   value: T
@@ -29,16 +30,11 @@ export function Select<T extends string | number>({
     function onMouse(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', onMouse)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onMouse)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('mousedown', onMouse)
   }, [open])
+
+  useEscapeLayer(open, () => setOpen(false))
 
   const current = options.find(o => o.value === value)
 

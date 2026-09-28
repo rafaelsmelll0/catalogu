@@ -190,7 +190,7 @@ export function DetailsModal({ media, onClose }: Props) {
               marginBottom: theme.spacing.md, alignItems: 'center',
             }}>
               {media.release_year && <span>{media.release_year}</span>}
-              {media.duration && (
+              {!!media.duration && media.duration > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>·</span>
                   <span>

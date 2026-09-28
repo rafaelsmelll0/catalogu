@@ -35,6 +35,15 @@ export function HeroBanner({ items, onDetailsClick, onAddToList }: Props) {
     }
   }, [pool.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Mantém o destaque em sincronia com o catálogo: se o título foi editado, mostra
+  // a versão nova; se foi excluído (ou perdeu o fundo), troca por outro.
+  useEffect(() => {
+    if (!current) return
+    const fresh = pool.find(p => p.id === current.id)
+    if (!fresh) setCurrent(pickRandom(pool, null))
+    else if (fresh !== current) setCurrent(fresh)
+  }, [items]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Rotação a cada 15s
   useEffect(() => {
     if (pool.length <= 1) return
