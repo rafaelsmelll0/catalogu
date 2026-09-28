@@ -22,12 +22,17 @@ const MOODS = [
   'Nacional',
 ]
 
-const LOADING_STEPS = [
-  'Lendo suas notas e observações…',
-  'Cruzando com o que você amou (e odiou)…',
-  'Escolhendo títulos que você ainda não viu…',
-  'Conferindo no TMDB se cada um existe mesmo…',
-]
+type LoadingKind = 'first' | 'profile' | 'recs'
+
+// O perfil é lido do catálogo uma vez e guardado; nas rodadas seguintes o
+// catálogo vai no pedido, mas o provedor reaproveita do cache.
+const RECS_STEPS    = ['Usando seu perfil e catálogo (em cache)…', 'Escolhendo títulos que você ainda não viu…', 'Conferindo no TMDB se cada um existe mesmo…']
+const PROFILE_STEPS = ['Lendo o catálogo inteiro…', 'Procurando padrões nas suas notas…', 'Escrevendo seu perfil de gosto…']
+const LOADING_STEPS: Record<LoadingKind, string[]> = {
+  recs:    RECS_STEPS,
+  profile: PROFILE_STEPS,
+  first:   [...PROFILE_STEPS, ...RECS_STEPS.slice(1)],
+}
 
 type Tipo = RecommendRequest['tipo']
 
@@ -43,7 +48,7 @@ export function ParaVocePage() {
   const [pedido, setPedido] = useState('')
   const [moods, setMoods]   = useState<string[]>([])
 
-  const [loading, setLoading]             = useState<null | 'profile' | 'recs'>(null)
+  const [loading, setLoading]             = useState<LoadingKind | null>(null)
   const [error, setError]                 = useState<string | null>(null)
   const [elapsed, setElapsed]             = useState(0)
 
@@ -68,7 +73,7 @@ export function ParaVocePage() {
   async function handleGenerate() {
     if (loading) return
     setError(null)
-    setLoading(profile ? 'recs' : 'profile')
+    setLoading(profile ? 'recs' : 'first')
     const fullPedido = [pedido.trim(), ...moods].filter(Boolean).join('; ')
     const res = await ipc<AiResult<RecommendResult>>('ai:recommend', { count: 10, tipo, pedido: fullPedido })
     setLoading(null)
@@ -411,10 +416,8 @@ function Segmented<T extends string>({ value, onChange, options }: {
 
 // ─── Carregando ─────────────────────────────────────────────────────────────
 
-function LoadingState({ kind, elapsed, thinking }: { kind: 'profile' | 'recs'; elapsed: number; thinking: boolean }) {
-  const steps = kind === 'profile'
-    ? ['Lendo o catálogo inteiro…', 'Procurando padrões nas suas notas…', 'Escrevendo seu perfil de gosto…', ...LOADING_STEPS.slice(2)]
-    : LOADING_STEPS
+function LoadingState({ kind, elapsed, thinking }: { kind: LoadingKind; elapsed: number; thinking: boolean }) {
+  const steps = LOADING_STEPS[kind]
   const step = steps[Math.min(Math.floor(elapsed / 8), steps.length - 1)]
 
   return (
