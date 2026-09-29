@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { theme } from '../styles/theme.ts'
-import CatSit from '../assets/cat-sit.svg?react'
+import { AnimatedCat } from '../components/AnimatedCat.tsx'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { QuickAdd } from '../components/home/QuickAdd.tsx'
@@ -39,7 +39,7 @@ export function HomePage() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           height: '60vh', gap: theme.spacing.md,
         }}>
-          <CatSit style={{ width: '140px', height: '140px', animation: 'float 3s ease-in-out infinite' }} />
+          <AnimatedCat size={110} />
           <h2 style={{ fontSize: theme.fontSizes.h2, fontWeight: theme.fontWeights.bold }}>Catálogo vazio</h2>
           <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
             Digite acima o último filme ou série que você viu.

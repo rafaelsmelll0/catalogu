@@ -5,6 +5,7 @@ import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { normalize } from '../lib/normalize.ts'
 import { Modal, Badge } from './ui/index.ts'
+import { AnimatedCat, AnimatedRoll } from './AnimatedCat.tsx'
 
 /**
  * Busca global (Ctrl+K): procura no catálogo e em Próximos por título, diretor,
@@ -491,14 +492,15 @@ export function SearchPalette({ open, onClose, onSelect }: Props) {
           )}
 
           {loadingEmpty && flat.length === 0 && (
-            <div style={{ padding: theme.spacing.lg, textAlign: 'center', color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
-              Carregando catálogo…
+            <div style={{ padding: theme.spacing.lg, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: theme.spacing.sm, color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
+              <AnimatedRoll size={20} mode="spin" /> Carregando catálogo…
             </div>
           )}
 
           {!loadingEmpty && q && flat.length === 0 && (
             <div style={{ padding: theme.spacing.xl, textAlign: 'center', color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
-              Nada encontrado para “{query.trim()}”.
+              <AnimatedCat size={64} style={{ marginBottom: theme.spacing.sm }} />
+              <div>Nada encontrado para “{query.trim()}”.</div>
             </div>
           )}
 

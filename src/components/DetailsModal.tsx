@@ -292,6 +292,7 @@ export function DetailsModal({ media, onClose, listContext }: Props) {
                   fontSize: theme.fontSizes.ui,
                   lineHeight: 1.6,
                   fontStyle: 'italic',
+                  whiteSpace: 'pre-line',
                 }}>
                   {media.observations}
                 </p>

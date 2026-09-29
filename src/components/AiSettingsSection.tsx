@@ -4,6 +4,7 @@ import { ipc } from '../lib/ipc.ts'
 import type { AiProvider, AiResult, AiSettings } from '../types/index.ts'
 import { Button, Input, Select, type SelectOption } from './ui/index.ts'
 import { showToast } from './Toast.tsx'
+import { AnimatedRoll } from './AnimatedCat.tsx'
 
 const PROVIDER_NOTES: Record<AiProvider, string> = {
   deepseek: 'Recomendado. Lê o catálogo inteiro com todas as suas observações; cada sugestão custa frações de centavo.',
@@ -193,7 +194,7 @@ function TestBadge({ test }: { test: TestState }) {
   const base: React.CSSProperties = { fontSize: theme.fontSizes.small, padding: '2px 10px', borderRadius: theme.radius.full }
   switch (test.kind) {
     case 'testing':
-      return <span style={{ ...base, color: theme.colors.textMuted }}>testando…</span>
+      return <span style={{ ...base, color: theme.colors.textMuted, display: 'inline-flex', alignItems: 'center', gap: '6px' }}><AnimatedRoll size={14} mode="spin" /> testando…</span>
     case 'ok':
       return <span style={{ ...base, color: theme.colors.success, background: `${theme.colors.success}18` }}>✓ conectado</span>
     case 'error':

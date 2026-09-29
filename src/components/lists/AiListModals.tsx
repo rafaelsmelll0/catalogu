@@ -7,7 +7,7 @@ import {
 } from '../../types/index.ts'
 import { Modal, Button, Input } from '../ui/index.ts'
 import { showToast } from '../Toast.tsx'
-import CatSit from '../../assets/cat-sit.svg?react'
+import { AnimatedCat } from '../AnimatedCat.tsx'
 
 function Thinking({ text }: { text: string }) {
   const [elapsed, setElapsed] = useState(0)
@@ -18,7 +18,7 @@ function Thinking({ text }: { text: string }) {
   }, [])
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing.sm, padding: `${theme.spacing.xxl} 0` }}>
-      <CatSit style={{ width: '90px', height: '90px', animation: 'float 2s ease-in-out infinite' }} />
+      <AnimatedCat size={80} mode="loading" />
       <div style={{ color: theme.colors.textPrimary, fontSize: theme.fontSizes.body }}>{text}</div>
       <div style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.small }}>{elapsed}s</div>
     </div>

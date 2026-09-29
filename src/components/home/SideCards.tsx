@@ -11,6 +11,7 @@ import { Button } from '../ui/index.ts'
 import { showToast } from '../Toast.tsx'
 import { DetailsModal } from '../DetailsModal.tsx'
 import { Panel, PanelLink } from './Panel.tsx'
+import { AnimatedCat, AnimatedRoll } from '../AnimatedCat.tsx'
 
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
 
@@ -120,9 +121,12 @@ export function ForYouCard() {
   return (
     <Panel title="Para você ✦" action={<PanelLink onClick={() => navigate('/para-voce')}>{items.length ? 'Ver todas →' : 'Gerar →'}</PanelLink>}>
       {items.length === 0 ? (
-        <p style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
-          Nenhuma sugestão esperando resposta. Peça novas no Para Você.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md }}>
+          <AnimatedCat size={44} style={{ flexShrink: 0 }} />
+          <p style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
+            Nenhuma sugestão esperando resposta. Peça novas no Para Você.
+          </p>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
           {items.slice(0, 3).map(s => (
@@ -206,7 +210,8 @@ export function FranchisesCard() {
     <Panel title="Franquias" action={<PanelLink onClick={() => navigate('/listas?franquias=1')}>Ver todas →</PanelLink>}>
       {scan ? (
         <div>
-          <div style={{ fontSize: theme.fontSizes.small, color: theme.colors.textSecondary, marginBottom: '6px' }}>
+          <div style={{ fontSize: theme.fontSizes.small, color: theme.colors.textSecondary, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
+            <AnimatedRoll size={18} mode="spin" />
             Descobrindo franquias no TMDB… {scan.current}/{scan.total}
           </div>
           <div style={{ height: '4px', background: theme.colors.surfaceHover, borderRadius: theme.radius.full, overflow: 'hidden' }}>
@@ -221,7 +226,9 @@ export function FranchisesCard() {
           <Button size="sm" onClick={runScan}>🎞 Descobrir franquias</Button>
         </div>
       ) : franchises === null ? (
-        <p style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>Carregando…</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>
+          <AnimatedRoll size={18} mode="spin" /> Carregando franquias…
+        </div>
       ) : incomplete.length === 0 ? (
         <p style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>Nenhuma franquia com filmes faltando. 🎉</p>
       ) : (

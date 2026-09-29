@@ -79,7 +79,7 @@ export function DiaryCard() {
                     fontSize: theme.fontSizes.small, color: theme.colors.textMuted, fontStyle: 'italic',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    "{m.observations}"
+                    "{m.observations.trim().replace(/\s*\n+\s*/g, ' · ')}"
                   </div>
                 )}
               </div>

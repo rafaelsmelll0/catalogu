@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { theme } from '../styles/theme.ts'
 import { Button } from './ui/index.ts'
+import { AnimatedCat } from './AnimatedCat.tsx'
 
 type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'error'
 
@@ -69,6 +70,9 @@ export function UpdateNotification() {
       maxWidth: '320px',
       animation: 'cardIn 0.3s ease-out',
     }}>
+      <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'flex-start' }}>
+      <AnimatedCat size={46} mode={state === 'available' || state === 'downloading' ? 'loading' : 'idle'} style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
       {state === 'available' && (
         <>
           <div style={{
@@ -185,6 +189,8 @@ export function UpdateNotification() {
           </div>
         </>
       )}
+      </div>
+      </div>
     </div>
   )
 }

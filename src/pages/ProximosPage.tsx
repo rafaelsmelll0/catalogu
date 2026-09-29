@@ -12,7 +12,7 @@ import {
   applyWatchlistFilters,
   type WatchlistFilters,
 } from '../components/WatchlistFilterBar.tsx'
-import Roll from '../assets/roll.svg?react'
+import { AnimatedRoll } from '../components/AnimatedCat.tsx'
 
 export function ProximosPage() {
   const { items, loading, fetchAll, removeItem } = useWatchlistStore()
@@ -84,9 +84,7 @@ export function ProximosPage() {
           justifyContent: 'center', height: '50vh', gap: theme.spacing.md,
           animation: 'pageIn 0.4s ease-out',
         }}>
-          <div style={{ width: '100px', height: '100px', animation: 'float 3s ease-in-out infinite' }}>
-            <Roll style={{ width: '100%', height: '100%', opacity: 0.25 }} />
-          </div>
+          <AnimatedRoll size={90} style={{ opacity: 0.5 }} />
           <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>
             Nenhum título na fila ainda
           </p>

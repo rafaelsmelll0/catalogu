@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { theme } from '../../styles/theme.ts'
 import type { Media } from '../../types/index.ts'
 import { MovieCard } from '../MovieCard.tsx'
-import Roll from '../../assets/roll.svg?react'
+import { AnimatedRoll } from '../AnimatedCat.tsx'
 
 interface Props {
   items:       Media[]
@@ -45,7 +45,7 @@ export function SortableListGrid({ items, numbered, onCardClick, onReorder }: Pr
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         height: '40vh', gap: theme.spacing.md, color: theme.colors.textMuted, fontSize: theme.fontSizes.body,
       }}>
-        <Roll style={{ width: '90px', height: '90px', opacity: 0.4, animation: 'float 3s ease-in-out infinite' }} />
+        <AnimatedRoll size={80} style={{ opacity: 0.6 }} />
         Esta lista está vazia. Clique em + Adicionar.
       </div>
     )

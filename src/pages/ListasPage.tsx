@@ -19,7 +19,7 @@ import { FranchisesModal } from '../components/lists/FranchisesModal.tsx'
 import { FranchiseParts } from '../components/lists/FranchiseParts.tsx'
 import { CompleteListModal, SuggestListsModal } from '../components/lists/AiListModals.tsx'
 import { SweepModal } from '../components/lists/SweepModal.tsx'
-import Roll from '../assets/roll.svg?react'
+import { AnimatedRoll } from '../components/AnimatedCat.tsx'
 import { LISTS_CHANGED_EVENT } from '../components/ListPickerModal.tsx'
 
 interface ListMediaItem extends Media {
@@ -318,7 +318,7 @@ export function ListasPage() {
               padding: theme.spacing.lg, color: theme.colors.textMuted, fontSize: theme.fontSizes.ui, textAlign: 'center',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing.sm,
             }}>
-              <Roll style={{ width: '40px', height: '40px', opacity: 0.3 }} />
+              <AnimatedRoll size={40} style={{ opacity: 0.5 }} />
               Nenhuma lista ainda
             </div>
           ) : grouped.map(g => {
@@ -358,7 +358,7 @@ export function ListasPage() {
       <section style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {!selected ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: theme.spacing.md }}>
-            <Roll style={{ width: '80px', height: '80px', opacity: 0.2, animation: 'float 3s ease-in-out infinite' }} />
+            <AnimatedRoll size={80} style={{ opacity: 0.45 }} />
             <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui }}>Selecione uma lista ou crie uma nova</p>
           </div>
         ) : (

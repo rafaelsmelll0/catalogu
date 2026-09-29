@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { theme } from '../styles/theme.ts'
-import Logo from '../assets/catalogu-logo.svg?react'
+import { AnimatedLogo } from './AnimatedCat.tsx'
 import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { AddMediaModal } from './AddMediaModal.tsx'
@@ -76,7 +76,7 @@ export function TopNav() {
             height: '36px',
           }}
         >
-          <Logo style={{ height: '36px', width: 'auto', display: 'block' }} />
+          <AnimatedLogo height={36} />
         </div>
 
         <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center', flex: 1, justifyContent: 'center' }}>

@@ -9,6 +9,7 @@ import { Badge, Button } from '../ui/index.ts'
 import { showToast } from '../Toast.tsx'
 import { MarkAsWatchedModal, type WatchedFields } from '../MarkAsWatchedModal.tsx'
 import { DetailsModal } from '../DetailsModal.tsx'
+import { AnimatedRoll } from '../AnimatedCat.tsx'
 
 type Owned =
   | { kind: 'catalog'; media: Media }
@@ -134,7 +135,11 @@ export function QuickAdd() {
             color: theme.colors.textPrimary, fontSize: theme.fontSizes.h3, fontFamily: theme.fonts.sans,
           }}
         />
-        {searching && <span style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted }}>buscando…</span>}
+        {searching && (
+          <span style={{ fontSize: theme.fontSizes.small, color: theme.colors.textMuted, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <AnimatedRoll size={18} mode="spin" /> buscando…
+          </span>
+        )}
         {query && !searching && (
           <button onClick={() => { setQuery(''); setResults([]) }} style={{
             background: 'none', border: 'none', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '18px',

@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useRef, useEffect } from 'react'
+import { type ReactNode, useState, useRef, useLayoutEffect } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 interface Props {
@@ -7,31 +7,49 @@ interface Props {
   side?:    'top' | 'bottom' | 'left' | 'right'
 }
 
+const GAP    = 8
+const MARGIN = 8
+
+/**
+ * Dica ao passar o mouse. Mede o próprio tamanho antes de aparecer e se mantém
+ * dentro da janela: se não cabe do lado pedido, vira para o oposto; se encosta
+ * numa borda, desliza para dentro. Textos longos quebram linha.
+ */
 export function Tooltip({ children, content, side = 'top' }: Props) {
   const [visible, setVisible] = useState(false)
-  const [coords, setCoords]   = useState({ top: 0, left: 0 })
+  const [pos, setPos]         = useState<{ top: number; left: number } | null>(null)
   const wrapperRef = useRef<HTMLSpanElement>(null)
+  const tipRef     = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!visible || !wrapperRef.current) return
-    const r   = wrapperRef.current.getBoundingClientRect()
-    const gap = 8
+  useLayoutEffect(() => {
+    if (!visible || !wrapperRef.current || !tipRef.current) { setPos(null); return }
+    const a = wrapperRef.current.getBoundingClientRect()
+    const { width: w, height: h } = tipRef.current.getBoundingClientRect()
+    const vw = window.innerWidth, vh = window.innerHeight
 
-    const positions = {
-      top:    { top: r.top - gap,          left: r.left + r.width / 2 },
-      bottom: { top: r.bottom + gap,       left: r.left + r.width / 2 },
-      left:   { top: r.top + r.height / 2, left: r.left - gap },
-      right:  { top: r.top + r.height / 2, left: r.right + gap },
+    const place = (s: Props['side']) => {
+      switch (s) {
+        case 'bottom': return { top: a.bottom + GAP,            left: a.left + a.width / 2 - w / 2 }
+        case 'left':   return { top: a.top + a.height / 2 - h / 2, left: a.left - GAP - w }
+        case 'right':  return { top: a.top + a.height / 2 - h / 2, left: a.right + GAP }
+        default:       return { top: a.top - GAP - h,           left: a.left + a.width / 2 - w / 2 }
+      }
     }
-    setCoords(positions[side])
-  }, [visible, side])
+    const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' } as const
 
-  const transforms = {
-    top:    'translate(-50%, -100%)',
-    bottom: 'translate(-50%, 0)',
-    left:   'translate(-100%, -50%)',
-    right:  'translate(0, -50%)',
-  }
+    let p = place(side)
+    const overflows = (q: { top: number; left: number }) =>
+      q.top < MARGIN || q.top + h > vh - MARGIN || q.left < MARGIN || q.left + w > vw - MARGIN
+    if ((side === 'top' || side === 'bottom') ? (p.top < MARGIN || p.top + h > vh - MARGIN) : overflows(p)) {
+      const q = place(opposite[side])
+      if (!overflows(q) || (side === 'top' || side === 'bottom')) p = q
+    }
+
+    setPos({
+      top:  Math.min(Math.max(p.top,  MARGIN), vh - h - MARGIN),
+      left: Math.min(Math.max(p.left, MARGIN), vw - w - MARGIN),
+    })
+  }, [visible, side, content])
 
   return (
     <>
@@ -45,23 +63,27 @@ export function Tooltip({ children, content, side = 'top' }: Props) {
       </span>
       {visible && (
         <div
+          ref={tipRef}
           style={{
             position: 'fixed',
-            top: coords.top,
-            left: coords.left,
-            transform: transforms[side],
+            top: pos?.top ?? 0,
+            left: pos?.left ?? 0,
+            // Primeiro render invisível só para medir; depois aparece já no lugar certo
+            visibility: pos ? 'visible' : 'hidden',
+            maxWidth: '300px',
             background: '#000',
             color: theme.colors.textPrimary,
             fontSize: '11px',
             fontWeight: theme.fontWeights.medium,
+            lineHeight: 1.4,
             padding: '6px 10px',
             borderRadius: theme.radius.sm,
             border: `1px solid ${theme.colors.surfaceHover}`,
             boxShadow: theme.shadows.card,
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
             pointerEvents: 'none',
             zIndex: 9999,
-            animation: 'dropdownIn 0.15s ease-out',
+            animation: pos ? 'dropdownIn 0.15s ease-out' : 'none',
           }}
         >
           {content}

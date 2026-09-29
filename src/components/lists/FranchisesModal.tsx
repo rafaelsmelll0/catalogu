@@ -5,6 +5,7 @@ import type { Franchise } from '../../types/index.ts'
 import { Modal, Button } from '../ui/index.ts'
 import { showToast } from '../Toast.tsx'
 import { FranchiseParts } from './FranchiseParts.tsx'
+import { AnimatedCat } from '../AnimatedCat.tsx'
 
 interface Props {
   onClose:    () => void
@@ -72,6 +73,7 @@ export function FranchisesModal({ onClose, onOpenList, onChanged }: Props) {
       <div style={{ padding: theme.spacing.lg }}>
         {scan ? (
           <div style={{ padding: `${theme.spacing.xl} 0`, textAlign: 'center' }}>
+            <AnimatedCat size={80} mode="loading" style={{ marginBottom: theme.spacing.md }} />
             <div style={{ fontSize: theme.fontSizes.body, color: theme.colors.textPrimary, marginBottom: theme.spacing.sm }}>
               Descobrindo a franquia de cada filme no TMDB…
             </div>
@@ -86,7 +88,7 @@ export function FranchisesModal({ onClose, onOpenList, onChanged }: Props) {
             </div>
           </div>
         ) : franchises === null ? (
-          <p style={{ color: theme.colors.textMuted, textAlign: 'center', padding: theme.spacing.xl }}>Carregando…</p>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: theme.spacing.xl }}><AnimatedCat size={70} mode="loading" /></div>
         ) : franchises.length === 0 ? (
           <p style={{ color: theme.colors.textMuted, textAlign: 'center', padding: theme.spacing.xl }}>
             Nenhuma franquia com 2 ou mais filmes no seu catálogo.

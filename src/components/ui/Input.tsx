@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, useState, type ReactNode } from 'react'
+import { type InputHTMLAttributes, useRef, useState, type ReactNode } from 'react'
 import { theme } from '../../styles/theme.ts'
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
@@ -10,6 +10,20 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 
 export function Input({ label, icon, error, hint, value, style, onFocus, onBlur, ...rest }: Props) {
   const [focused, setFocused] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isNumber = rest.type === 'number'
+
+  /** ▲▼ próprios para campos numéricos (as setas nativas do Windows ficam brancas). */
+  function step(dir: 1 | -1) {
+    const el = inputRef.current
+    if (!el || el.disabled) return
+    if (el.value === '') el.value = String(rest.min ?? 0)
+    else if (dir > 0) el.stepUp()
+    else el.stepDown()
+    // Dispara o onChange do React como se o usuário tivesse digitado
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.focus()
+  }
   const hasValue = value !== undefined && value !== ''
   const floating = focused || hasValue
 
@@ -70,6 +84,7 @@ export function Input({ label, icon, error, hint, value, style, onFocus, onBlur,
 
         <input
           {...rest}
+          ref={inputRef}
           value={value ?? ''}
           onFocus={e => { setFocused(true); onFocus?.(e) }}
           onBlur={e => { setFocused(false); onBlur?.(e) }}
@@ -86,11 +101,40 @@ export function Input({ label, icon, error, hint, value, style, onFocus, onBlur,
             paddingTop:    label ? (floating ? '22px' : '0') : '0',
             paddingBottom: label ? (floating ? '6px'  : '0') : '0',
             paddingLeft:  `${TEXT_LEFT}px`,
-            paddingRight: '16px',
+            paddingRight: isNumber ? '40px' : '16px',
             height: '100%',
             width: '100%',
           }}
         />
+        {isNumber && (
+          <div style={{
+            position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+            display: 'flex', flexDirection: 'column', gap: '2px',
+          }}>
+            {([1, -1] as const).map(dir => (
+              <button
+                key={dir}
+                type="button"
+                tabIndex={-1}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => step(dir)}
+                aria-label={dir > 0 ? 'Aumentar' : 'Diminuir'}
+                style={{
+                  width: '26px', height: '18px', padding: 0, cursor: 'pointer',
+                  border: `1px solid ${theme.colors.surfaceHover}`, borderRadius: '4px',
+                  background: theme.colors.surfaceElevated, color: theme.colors.textSecondary,
+                  fontSize: '9px', lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: `background ${theme.transitions.fast}, color ${theme.transitions.fast}`,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = theme.colors.primary; e.currentTarget.style.color = '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.background = theme.colors.surfaceElevated; e.currentTarget.style.color = theme.colors.textSecondary }}
+              >
+                {dir > 0 ? '▲' : '▼'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (

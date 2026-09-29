@@ -4,7 +4,7 @@ import { ipc } from '../../lib/ipc.ts'
 import { LIST_KIND_LABEL, type AiResult, type ListEntryRef, type SweepItem, type SweepResult } from '../../types/index.ts'
 import { Modal, Button, Badge } from '../ui/index.ts'
 import { showToast } from '../Toast.tsx'
-import CatSit from '../../assets/cat-sit.svg?react'
+import { AnimatedCat } from '../AnimatedCat.tsx'
 
 interface Props {
   listCount: number
@@ -98,7 +98,7 @@ export function SweepModal({ listCount, onClose, onApplied }: Props) {
           </div>
         ) : !data ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing.sm, padding: `${theme.spacing.xxl} 0` }}>
-            <CatSit style={{ width: '90px', height: '90px', animation: 'float 2s ease-in-out infinite' }} />
+            <AnimatedCat size={80} mode="loading" />
             <div style={{ color: theme.colors.textPrimary, fontSize: theme.fontSizes.body }}>
               Comparando catálogo e Próximos com suas {listCount} listas…
             </div>

@@ -10,7 +10,7 @@ import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { Button, Input, Textarea, Badge } from '../components/ui/index.ts'
 import { MarkAsWatchedModal, type WatchedFields } from '../components/MarkAsWatchedModal.tsx'
 import { showToast } from '../components/Toast.tsx'
-import CatSit from '../assets/cat-sit.svg?react'
+import { AnimatedCat } from '../components/AnimatedCat.tsx'
 
 const MOODS = [
   'Algo curto (até 1h45)',
@@ -221,7 +221,7 @@ function NoKeyState({ onConfigure }: { onConfigure: () => void }) {
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing.md,
       padding: `${theme.spacing.xxl} 0`, textAlign: 'center',
     }}>
-      <CatSit style={{ width: '120px', height: '120px', animation: 'float 3s ease-in-out infinite' }} />
+      <AnimatedCat size={95} />
       <h2 style={{ fontSize: theme.fontSizes.h2, fontWeight: theme.fontWeights.bold }}>Falta só a chave da IA</h2>
       <p style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.ui, maxWidth: '460px', lineHeight: 1.6 }}>
         Cole sua chave do DeepSeek (ou do Groq) em Configurações. Ela fica criptografada neste computador.
@@ -450,7 +450,7 @@ function LoadingState({ kind, elapsed, thinking }: { kind: LoadingKind; elapsed:
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing.md,
       padding: `${theme.spacing.xxl} 0`,
     }}>
-      <CatSit style={{ width: '110px', height: '110px', animation: 'float 2s ease-in-out infinite' }} />
+      <AnimatedCat size={88} mode="loading" />
       <div style={{ fontSize: theme.fontSizes.body, color: theme.colors.textPrimary, fontWeight: theme.fontWeights.medium }}>
         {step}
       </div>

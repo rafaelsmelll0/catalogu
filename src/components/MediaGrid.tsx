@@ -1,8 +1,7 @@
 import { theme } from '../styles/theme.ts'
 import type { Media } from '../types/index.ts'
 import { MovieCard } from './MovieCard.tsx'
-import CatSit from '../assets/cat-sit.svg?react'
-import Roll from '../assets/roll.svg?react'
+import { AnimatedCat, AnimatedRoll } from './AnimatedCat.tsx'
 
 interface Props {
   items:         Media[]
@@ -20,10 +19,10 @@ export function MediaGrid({ items, onCardClick, emptyMessage, emptyIcon = 'cat' 
         height: '50vh', gap: theme.spacing.md,
         animation: 'pageIn 0.4s ease-out',
       }}>
-        <div style={{ width: '100px', height: '100px', animation: 'float 3s ease-in-out infinite' }}>
+        <div style={{ width: '100px', height: '100px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', }}>
           {emptyIcon === 'roll'
-            ? <Roll style={{ width: '100%', height: '100%' }} />
-            : <CatSit style={{ width: '100%', height: '100%' }} />
+            ? <AnimatedRoll size={84} />
+            : <AnimatedCat size={76} />
           }
         </div>
         <p style={{

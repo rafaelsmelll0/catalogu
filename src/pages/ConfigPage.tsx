@@ -6,6 +6,7 @@ import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { showToast } from '../components/Toast.tsx'
 import { AiSettingsSection } from '../components/AiSettingsSection.tsx'
 import { AboutSection } from '../components/AboutSection.tsx'
+import { AnimatedCat } from '../components/AnimatedCat.tsx'
 
 interface ImageProgress {
   current: number
@@ -261,6 +262,9 @@ export function ConfigPage() {
 
         {updatingImages && imageProgress && (
           <div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: theme.spacing.md }}>
+              <AnimatedCat size={64} mode="loading" />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing.xs }}>
               <span style={{ fontSize: theme.fontSizes.ui, color: theme.colors.textSecondary }}>
                 {imageProgress.current} de {imageProgress.total} — {imageProgress.title}
