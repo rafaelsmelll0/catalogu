@@ -5,13 +5,14 @@ import { loadDetails, addTmdbToWatchlist } from './tmdbImport.js'
 import { findDuplicateInMedia } from './queries.js'
 import { searchForMatch, type TmdbMatchCandidate } from './tmdb.js'
 import { titlesMatch, pickCandidate } from './aiMatch.js'
+import { getFranchises, scanCollections, countPendingScan } from './collections.js'
 import { localizeMediaImages } from './imageStore.js'
 import { getActiveConfig } from './aiSettings.js'
 import { chatJson, AiError, type AiUsage } from './aiClient.js'
 import { getAllLists, getMediaInList, createList, addManyToList, type ListKind, type ListEntryRef } from './queries.js'
 import {
-  buildProfileMessages, buildRecommendMessages, buildCompleteListMessages, buildSuggestListsMessages,
-  type RawCompletion, type RawListSuggestion, type RawListMember,
+  buildProfileMessages, buildRecommendMessages, buildCompleteListMessages, buildSuggestListsMessages, buildSweepListsMessages,
+  type RawCompletion, type RawListSuggestion, type RawListMember, type RawSweep,
   type CatalogEntry, type FeedbackEntry, type RawSuggestion, type RecommendRequest, type SimpleTitle,
 } from './aiPrompts.js'
 
@@ -480,4 +481,125 @@ export function createListFromProposal(p: { name: string; kind: ListKind; descri
   const listId = createList(p.name.trim(), p.description.trim(), p.kind)
   addManyToList(listId, p.items)
   return { listId }
+}
+
+// ─── Varredura: encaixar catálogo e Próximos nas listas existentes ──────────
+
+export interface SweepItem extends ListCandidateRef {
+  source: 'tmdb' | 'ia'
+  reason: string
+}
+
+export interface SweepGroup {
+  listId:   number
+  listName: string
+  kind:     ListKind
+  items:    SweepItem[]
+}
+
+export interface SweepResult {
+  groups:  SweepGroup[]
+  /** a parte temática (IA) rodou? (sem chave configurada, só o TMDB) */
+  aiUsed:  boolean
+  aiError: string | null
+  /** franquias ainda não analisadas no TMDB (primeira vez é feita na janela Franquias) */
+  franchisesPending: number
+}
+
+const KV_SWEEP_DISMISSED = 'lists.sweepDismissed'
+const sweepKey = (listId: number, e: ListEntryRef) => `${listId}:${e.kind}:${e.id}`
+
+export async function sweepLists(): Promise<SweepResult> {
+  const lists = getAllLists()
+  if (lists.length === 0) throw new AiError('Crie uma lista antes de varrer o catálogo.')
+
+  const members = new Map(lists.map(l => [l.id, getMediaInList(l.id)]))
+  const inList  = new Map(lists.map(l => [l.id, new Set(members.get(l.id)!.map(m =>
+    m.isProximo ? `watchlist:${m.watchlistId}` : `media:${m.id}`))]))
+  const dismissed = new Set(kvGet<string[]>(KV_SWEEP_DISMISSED) ?? [])
+  const owned     = ownedRefs()
+  const ownedByKey = new Map(owned.map(o => [`${o.kind}:${o.id}`, o]))
+
+  const groups = new Map<number, SweepGroup>()
+  const push = (listId: number, ref: ListCandidateRef, source: SweepItem['source'], reason: string) => {
+    const key = `${ref.kind}:${ref.id}`
+    if (inList.get(listId)?.has(key) || dismissed.has(sweepKey(listId, ref))) return
+    const list = lists.find(l => l.id === listId)!
+    const g = groups.get(listId) ?? { listId, listName: list.name, kind: list.kind, items: [] }
+    if (g.items.some(i => `${i.kind}:${i.id}` === key)) return
+    g.items.push({ ...ref, source, reason })
+    groups.set(listId, g)
+  }
+
+  // 1) Franquias do TMDB: filme da coleção vinculada que ainda não está na lista (certeiro)
+  let franchisesPending = countPendingScan()
+  if (franchisesPending > 0 && franchisesPending <= 20) {
+    await scanCollections()
+    franchisesPending = 0
+  }
+  for (const f of await getFranchises()) {
+    if (!f.listId) continue
+    for (const p of f.parts) {
+      const ref = p.mediaId ? ownedByKey.get(`media:${p.mediaId}`) : p.watchlistId ? ownedByKey.get(`watchlist:${p.watchlistId}`) : undefined
+      if (ref) push(f.listId, ref, 'tmdb', `Mesma franquia no TMDB (${f.name})`)
+    }
+  }
+
+  // 2) IA: critérios temáticos (e o que o TMDB não cobre, como crossovers)
+  let aiUsed = false
+  let aiError: string | null = null
+  const cfg = getActiveConfig()
+  if (cfg) {
+    try {
+      const { data } = await chatJson<RawSweep>(cfg, buildSweepListsMessages({
+        catalog:   loadCatalog(),
+        watchlist: getAllWatchlist().map<SimpleTitle>(w => ({ title: w.title, year: w.release_year, tipo: w.tipo })),
+        lists: lists.map(l => ({
+          name: l.name, kind: l.kind, description: l.description,
+          members: members.get(l.id)!.map<SimpleTitle>(m => ({ title: m.title, year: m.release_year, tipo: m.tipo })),
+        })),
+        budgetChars: cfg.info.contextChars,
+      }), { temperature: 0.3, maxTokens: cfg.provider === 'groq' ? 3000 : 8000 })
+      aiUsed = true
+
+      for (const g of data.listas ?? []) {
+        const list = lists.find(l => titlesMatch(l.name, g.lista ?? '') || l.name.toLowerCase() === (g.lista ?? '').toLowerCase())
+        if (!list) continue
+        for (const t of g.titulos ?? []) {
+          const hit = t?.titulo ? matchOwned(t, owned) : null
+          if (hit) push(list.id, hit, 'ia', (t.motivo ?? '').trim() || 'Combina com o critério da lista')
+        }
+      }
+    } catch (err) {
+      aiError = err instanceof AiError ? err.message : 'A IA falhou nesta varredura.'
+    }
+  }
+
+  const sorted = [...groups.values()]
+    .map(g => ({ ...g, items: g.items.sort((a, b) => (a.source === b.source ? 0 : a.source === 'tmdb' ? -1 : 1)) }))
+    .sort((a, b) => a.listName.localeCompare(b.listName, 'pt-BR'))
+  return { groups: sorted, aiUsed, aiError, franchisesPending }
+}
+
+/**
+ * Aplica a revisão da varredura: adiciona o que ficou marcado e lembra o que foi
+ * desmarcado ("não pertence"), para não voltar a sugerir para aquela lista.
+ */
+export function applySweep(input: {
+  add:       { listId: number; entries: ListEntryRef[] }[]
+  dismissed: { listId: number; entry: ListEntryRef }[]
+}): { added: number } {
+  let added = 0
+  for (const a of input.add) if (a.entries.length) added += addManyToList(a.listId, a.entries)
+  if (input.dismissed.length) {
+    const set = new Set(kvGet<string[]>(KV_SWEEP_DISMISSED) ?? [])
+    for (const d of input.dismissed) set.add(sweepKey(d.listId, d.entry))
+    kvSet(KV_SWEEP_DISMISSED, [...set])
+  }
+  return { added }
+}
+
+/** Esquece as recusas da varredura (volta a sugerir tudo). */
+export function resetSweepDismissed(): void {
+  kvSet(KV_SWEEP_DISMISSED, [])
 }

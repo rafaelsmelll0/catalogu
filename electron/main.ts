@@ -29,7 +29,7 @@ import { listModels, AiError } from './aiClient.js'
 import {
   getProfile, generateProfile, saveProfileText,
   recommend, getLastRecommendations, setFeedback, addSuggestionToWatchlist, addSuggestionToCatalog,
-  completeList, suggestLists, createListFromProposal,
+  completeList, suggestLists, createListFromProposal, sweepLists, applySweep, resetSweepDismissed,
   type Verdict, type WatchedFields,
 } from './aiService.js'
 import type { RecommendRequest } from './aiPrompts.js'
@@ -138,6 +138,9 @@ function registerIpcHandlers() {
     aiCall(() => addSuggestionToWatchlist(tmdbId, tipo))())
   ipcMain.handle('ai:completeList',  (_e, listId: number) => aiCall(() => completeList(listId))())
   ipcMain.handle('ai:suggestLists',  () => aiCall(() => suggestLists())())
+  ipcMain.handle('lists:sweep',      () => aiCall(() => sweepLists())())
+  ipcMain.handle('lists:applySweep', (_e, input: Parameters<typeof applySweep>[0]) => aiCall(() => applySweep(input))())
+  ipcMain.handle('lists:resetSweep', () => resetSweepDismissed())
   ipcMain.handle('ai:createList',    (_e, p: Parameters<typeof createListFromProposal>[0]) => aiCall(() => createListFromProposal(p))())
   ipcMain.handle('ai:addToCatalog', (_e, tmdbId: number, tipo: 'filme' | 'serie', fields: WatchedFields) =>
     aiCall(() => addSuggestionToCatalog(tmdbId, tipo, fields))())

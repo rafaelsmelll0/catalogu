@@ -18,6 +18,7 @@ import { AddToListModal } from '../components/lists/AddToListModal.tsx'
 import { FranchisesModal } from '../components/lists/FranchisesModal.tsx'
 import { FranchiseParts } from '../components/lists/FranchiseParts.tsx'
 import { CompleteListModal, SuggestListsModal } from '../components/lists/AiListModals.tsx'
+import { SweepModal } from '../components/lists/SweepModal.tsx'
 import Roll from '../assets/roll.svg?react'
 import { LISTS_CHANGED_EVENT } from '../components/ListPickerModal.tsx'
 
@@ -73,6 +74,7 @@ export function ListasPage() {
   const [showFranchises, setShowFranchises] = useState(false)
   const [showComplete, setShowComplete]     = useState(false)
   const [showSuggest, setShowSuggest]       = useState(false)
+  const [showSweep, setShowSweep]           = useState(false)
   const [detail, setDetail]                 = useState<ListMediaItem | null>(null)
 
   const selectedId = Number(params.get('lista')) || null
@@ -280,6 +282,18 @@ export function ListasPage() {
               </Button>
             </Tooltip>
           </div>
+          {lists.length > 0 && (
+            <Tooltip
+              content={aiEnabled
+                ? 'Procura no catálogo e em Próximos o que se encaixa nas listas que você já tem'
+                : 'Sem IA, encaixa só pelas franquias do TMDB'}
+              side="bottom"
+            >
+              <Button size="sm" variant="secondary" onClick={() => setShowSweep(true)} style={{ width: '100%' }}>
+                🔎 Varrer catálogo nas listas
+              </Button>
+            </Tooltip>
+          )}
 
           {lists.length > 6 && (
             <input
@@ -487,6 +501,9 @@ export function ListasPage() {
           onClose={() => setShowComplete(false)}
           onChanged={refresh}
         />
+      )}
+      {showSweep && (
+        <SweepModal listCount={lists.length} onClose={() => setShowSweep(false)} onApplied={refresh} />
       )}
       {showSuggest && (
         <SuggestListsModal

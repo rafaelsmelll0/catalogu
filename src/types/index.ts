@@ -250,3 +250,22 @@ export interface YearSummary {
   byMonth:        number[]
   prevSamePeriod: number
 }
+
+export interface SweepItem extends ListCandidateRef {
+  source: 'tmdb' | 'ia'
+  reason: string
+}
+
+export interface SweepGroup {
+  listId:   number
+  listName: string
+  kind:     ListKind
+  items:    SweepItem[]
+}
+
+export interface SweepResult {
+  groups:            SweepGroup[]
+  aiUsed:            boolean
+  aiError:           string | null
+  franchisesPending: number
+}

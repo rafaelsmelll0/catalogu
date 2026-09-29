@@ -317,3 +317,52 @@ LISTAS QUE ELE JÁ TEM: ${existing}`,
     },
   ]
 }
+
+// ─── Varredura: catálogo inteiro contra todas as listas ─────────────────────
+
+export interface RawSweep {
+  listas?: { lista: string; titulos?: (RawListMember & { motivo?: string })[] }[]
+}
+
+export function buildSweepListsMessages(input: {
+  catalog:   CatalogEntry[]
+  watchlist: SimpleTitle[]
+  lists:     { name: string; kind: string; description: string; members: SimpleTitle[] }[]
+  budgetChars: number
+}): ChatMessage[] {
+  const fmt = (xs: SimpleTitle[]) => xs.length ? xs.map(t => `${t.title}${yearOf(t)}`).join('; ') : '(vazia)'
+  const listsBlock = input.lists.map(l =>
+    `- "${l.name}" (${KIND_LABEL[l.kind] ?? l.kind})${l.description ? ` — ${l.description}` : ''}\n  Já tem: ${fmt(l.members.slice(0, 60))}`,
+  ).join('\n')
+
+  return [
+    {
+      role: 'system',
+      content: `${PERSONA}
+
+Tarefa: VARRER o catálogo e os Próximos dele e apontar, para cada lista EXISTENTE, os títulos que se encaixam nela mas ainda não estão lá.
+
+Regras:
+- Use SOMENTE títulos que estão no CATÁLOGO ou em PRÓXIMOS, escritos EXATAMENTE como aparecem, com o ano.
+- Entenda o critério de cada lista pelo nome, pela descrição e pelos títulos que já estão nela
+  (ex.: uma lista de franquia pode incluir crossovers e derivados que ele já agrupou ali).
+- Seja criterioso: só sugira quando o título claramente pertence à lista. Na dúvida, deixe de fora.
+- Não repita títulos que já estão na lista. Um título pode ir para mais de uma lista.
+- "motivo": até 8 palavras explicando o encaixe.
+- Omita listas sem sugestões.
+
+Responda APENAS com JSON:
+{"listas": [{"lista": "nome exato da lista", "titulos": [{"titulo": "", "ano": 2000, "motivo": ""}]}]}`,
+    },
+    {
+      role: 'user',
+      content: `CATÁLOGO DELE (nota · título (ano) · gêneros · diretor · tags · listas — "observações"):
+${formatCatalog(input.catalog, input.budgetChars)}
+
+EM PRÓXIMOS: ${fmt(input.watchlist)}
+
+LISTAS EXISTENTES:
+${listsBlock}`,
+    },
+  ]
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatCatalog, buildRecommendMessages, buildProfileMessages, type CatalogEntry } from '../aiPrompts.js'
+import { formatCatalog, buildRecommendMessages, buildProfileMessages, buildSweepListsMessages, type CatalogEntry } from '../aiPrompts.js'
 import { titlesMatch, pickCandidate, type MatchCandidate } from '../aiMatch.js'
 import { parseJsonLoose } from '../aiClient.js'
 
@@ -175,5 +175,25 @@ describe('chatJson (servidor local)', () => {
     } finally {
       server.close()
     }
+  })
+})
+
+describe('varredura de listas (prompt)', () => {
+  it('manda cada lista com tipo, descrição e o que já tem, e o catálogo antes das listas', () => {
+    const msgs = buildSweepListsMessages({
+      catalog:   [entry({ title: 'Extermínio', year: '2002' }), entry({ title: 'Guerra Mundial Z', year: '2013' })],
+      watchlist: [{ title: 'Invasão Zumbi', year: '2016', tipo: 'filme' }],
+      lists: [
+        { name: 'Zumbis', kind: 'tema', description: 'Mortos-vivos', members: [{ title: 'Extermínio', year: '2002', tipo: 'filme' }] },
+        { name: 'Vazia', kind: 'livre', description: '', members: [] },
+      ],
+      budgetChars: 10_000,
+    })
+    const user = msgs[1].content
+    expect(msgs[0].content).toContain('"lista": "nome exato da lista"')
+    expect(user).toContain('- "Zumbis" (lista temática) — Mortos-vivos\n  Já tem: Extermínio (2002)')
+    expect(user).toContain('Já tem: (vazia)')
+    expect(user).toContain('EM PRÓXIMOS: Invasão Zumbi (2016)')
+    expect(user.indexOf('CATÁLOGO')).toBeLessThan(user.indexOf('LISTAS EXISTENTES'))
   })
 })
