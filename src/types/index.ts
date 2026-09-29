@@ -228,3 +228,25 @@ export interface ListProposal {
   description: string
   items:       ListCandidateRef[]
 }
+
+// ─── Início (painel) ────────────────────────────────────────────────────────
+
+export interface TmdbMultiResult {
+  id:            number
+  tipo:          MediaType
+  title:         string
+  originalTitle: string
+  year:          string
+  posterUrl:     string | null
+  overview:      string
+  popularity:    number
+}
+
+export interface YearSummary {
+  year:           string
+  count:          number
+  minutes:        number
+  avgRating:      number | null
+  byMonth:        number[]
+  prevSamePeriod: number
+}

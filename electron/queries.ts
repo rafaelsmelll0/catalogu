@@ -671,3 +671,49 @@ export function getStats() {
     porAno,
   }
 }
+
+export interface YearSummary {
+  year:      string
+  count:     number
+  minutes:   number
+  avgRating: number | null
+  /** 12 posições: assistidos por mês (jan..dez) */
+  byMonth:   number[]
+  /** total do ano anterior até o mesmo dia (para comparar) */
+  prevSamePeriod: number
+}
+
+/** Resumo do ano pela data em que assistiu (card "Ano em números" da Início). */
+export function getYearSummary(year: string, todayMonthDay: string): YearSummary {
+  const db = getDatabase()
+  const row = db.prepare(`
+    SELECT COUNT(*) AS n,
+      COALESCE(SUM(CASE WHEN tipo = 'filme' AND duration > 0 THEN duration END), 0) AS min,
+      AVG(CASE WHEN rating > 0 THEN rating END) AS avg
+    FROM media
+    WHERE watched_status = 'assistido' AND substr(watched_date, 1, 4) = ?
+  `).get(year) as { n: number; min: number; avg: number | null }
+
+  const months = db.prepare(`
+    SELECT CAST(substr(watched_date, 6, 2) AS INTEGER) AS m, COUNT(*) AS n
+    FROM media
+    WHERE watched_status = 'assistido' AND substr(watched_date, 1, 4) = ?
+    GROUP BY m
+  `).all(year) as { m: number; n: number }[]
+  const byMonth = Array.from({ length: 12 }, (_, i) => months.find(x => x.m === i + 1)?.n ?? 0)
+
+  const prevYear = String(Number(year) - 1)
+  const prev = db.prepare(`
+    SELECT COUNT(*) AS n FROM media
+    WHERE watched_status = 'assistido' AND substr(watched_date, 1, 4) = ? AND substr(watched_date, 6, 5) <= ?
+  `).get(prevYear, todayMonthDay) as { n: number }
+
+  return {
+    year,
+    count:     row.n,
+    minutes:   row.min,
+    avgRating: row.avg ? Math.round(row.avg * 10) / 10 : null,
+    byMonth,
+    prevSamePeriod: prev.n,
+  }
+}

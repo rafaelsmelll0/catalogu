@@ -10,14 +10,14 @@ import {
   getAllLists, createList, updateList, deleteList,
   getMediaInList, addMediaToList, removeMediaFromList,
   addWatchlistItemToList, removeWatchlistItemFromList,
-  addManyToList, reorderList, getListIdsFor,
+  addManyToList, reorderList, getListIdsFor, getYearSummary,
   type ListKind, type UpdateListInput, type ListEntryRef,
   findDuplicateInMedia,
 } from './queries.js'
-import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
+import { searchMulti, searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
 import {
   getAllWatchlist, addToWatchlist, removeFromWatchlist, getWatchlistCount,
-  findDuplicateInWatchlist, promoteToMedia,
+  findDuplicateInWatchlist, promoteToMedia, demoteToWatchlist,
   type AddWatchlistInput,
 } from './watchlistQueries.js'
 import type { AddMediaInput } from './queries.js'
@@ -68,6 +68,12 @@ function registerIpcHandlers() {
   ipcMain.handle('tags:getAll',       () => getAllTags())
   ipcMain.handle('genres:getAll',     () => getAllGenres())
   ipcMain.handle('stats:get',         () => getStats())
+  ipcMain.handle('stats:year',        (_e, year: string, monthDay: string) => getYearSummary(year, monthDay))
+  ipcMain.handle('tmdb:searchMulti',  (_e, query: string) => searchMulti(query))
+  ipcMain.handle('media:moveToWatchlist', (_e, mediaId: number) => demoteToWatchlist(mediaId))
+  // Cadastro direto de um título do TMDB com nota/opinião ("O que você assistiu?")
+  ipcMain.handle('catalog:addFromTmdb', (_e, tmdbId: number, tipo: 'filme' | 'serie', fields: WatchedFields) =>
+    aiCall(() => addSuggestionToCatalog(tmdbId, tipo, fields))())
   ipcMain.handle('tmdb:searchMovies', (_e, query: string) => searchMovies(query))
   ipcMain.handle('tmdb:searchSeries', (_e, query: string) => searchSeries(query))
   ipcMain.handle('tmdb:movieDetails', (_e, id: number)    => getMovieDetails(id))

@@ -85,6 +85,16 @@ export function ListasPage() {
     ipc<AiSettings>('ai:getSettings').then(s => setAiEnabled(s.hasKey)).catch(() => {})
   }, [])
 
+  // Vindo do card "Franquias" da Início: abre direto a janela de franquias
+  useEffect(() => {
+    if (params.get('franquias')) {
+      setShowFranchises(true)
+      const next = new URLSearchParams(params)
+      next.delete('franquias')
+      setParams(next, { replace: true })
+    }
+  }, [])
+
   // Mudanças feitas pelo seletor de listas aberto em outro lugar (busca, detalhes…)
   useEffect(() => {
     const onChange = () => { loadLists(); if (selectedId) loadListContent(selectedId) }

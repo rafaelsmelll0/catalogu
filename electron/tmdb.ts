@@ -134,3 +134,37 @@ export async function getCollection(id: number): Promise<TmdbCollection> {
     parts: (data.parts ?? []).map(p => ({ id: p.id, title: p.title, release_date: p.release_date ?? '', poster_path: p.poster_path })),
   }
 }
+
+export interface TmdbMultiResult {
+  id:        number
+  tipo:      'filme' | 'serie'
+  title:     string
+  originalTitle: string
+  year:      string
+  posterUrl: string | null
+  overview:  string
+  popularity: number
+}
+
+/** Busca filmes e séries juntos (sem pessoas), para o "O que você assistiu?". */
+export async function searchMulti(query: string): Promise<TmdbMultiResult[]> {
+  if (!API_KEY || !query.trim()) return []
+  const url = `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&include_adult=false`
+  const data = await fetchJson<{ results: {
+    id: number; media_type: string; title?: string; name?: string; original_title?: string; original_name?: string
+    release_date?: string; first_air_date?: string; poster_path?: string | null; overview?: string; popularity?: number
+  }[] }>(url)
+  return (data.results ?? [])
+    .filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+    .slice(0, 10)
+    .map(r => ({
+      id:            r.id,
+      tipo:          r.media_type === 'movie' ? 'filme' as const : 'serie' as const,
+      title:         r.title ?? r.name ?? '',
+      originalTitle: r.original_title ?? r.original_name ?? '',
+      year:          (r.release_date ?? r.first_air_date ?? '').slice(0, 4),
+      posterUrl:     getPosterUrl(r.poster_path ?? null, 'w185'),
+      overview:      r.overview ?? '',
+      popularity:    r.popularity ?? 0,
+    }))
+}

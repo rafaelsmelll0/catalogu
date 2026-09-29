@@ -288,3 +288,21 @@ describe('correções v3.3.1', () => {
     expect(queries.getMediaById(id)).toBeNull()
   })
 })
+
+describe('getYearSummary', () => {
+  it('conta por mês, soma minutos de filmes, média e compara com o mesmo período do ano anterior', async () => {
+    const { queries } = await freshDb()
+    queries.addMedia({ ...sampleMovie, title: 'A', tmdb_id: 1, rating: 8, duration: 100, watched_date: '2026-01-10' })
+    queries.addMedia({ ...sampleMovie, title: 'B', tmdb_id: 2, rating: 6, duration: 90,  watched_date: '2026-03-05' })
+    queries.addMedia({ ...sampleMovie, title: 'C', tmdb_id: 3, tipo: 'serie', rating: 0, duration: 20, watched_date: '2026-03-20' })
+    queries.addMedia({ ...sampleMovie, title: 'D', tmdb_id: 4, watched_date: '2025-02-01' })
+    queries.addMedia({ ...sampleMovie, title: 'E', tmdb_id: 5, watched_date: '2025-11-01' })
+
+    const y = queries.getYearSummary('2026', '09-28')
+    expect(y.count).toBe(3)
+    expect(y.minutes).toBe(190)
+    expect(y.avgRating).toBe(7)
+    expect(y.byMonth.slice(0, 3)).toEqual([1, 0, 2])
+    expect(y.prevSamePeriod).toBe(1) // só o de fevereiro/2025 é até 28/09
+  })
+})

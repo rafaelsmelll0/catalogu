@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { freshDb, sampleWatchlist } from './_setup.js'
+import { freshDb, sampleMovie, sampleWatchlist } from './_setup.js'
 
 describe('watchlist — básico', () => {
   it('adiciona e lista itens de Próximos', async () => {
@@ -156,5 +156,22 @@ describe('watchlist — correções v3.3.1', () => {
     const { watchlist } = await freshDb()
     const id = watchlist.addToWatchlist({ ...sampleWatchlist, cover_path: 'catimg://p.webp' })
     expect(watchlist.removeFromWatchlist(id)).toEqual({ cover_path: 'catimg://p.webp', backdrop_path: null })
+  })
+})
+
+describe('demoteToWatchlist — catálogo de volta para Próximos', () => {
+  it('leva dados, gêneros, elenco e listas, e remove do catálogo', async () => {
+    const { queries, watchlist } = await freshDb()
+    const mediaId = queries.addMedia({ ...sampleMovie, watched_status: 'nao_assistido', cover_path: 'catimg://p.webp' })
+    const list = queries.createList('Quero ver')
+    queries.addMediaToList(mediaId, list)
+
+    const wid = watchlist.demoteToWatchlist(mediaId)
+
+    expect(queries.getMediaById(mediaId)).toBeNull()
+    const w = watchlist.getAllWatchlist().find(x => x.id === wid)!
+    expect(w).toMatchObject({ title: 'Matrix', tipo: 'filme', tmdb_id: 603, cover_path: 'catimg://p.webp', director: 'Lana Wachowski' })
+    expect(w.genres).toEqual(expect.arrayContaining(['Ação', 'Ficção científica']))
+    expect(queries.getMediaInList(list).map(i => i.isProximo)).toEqual([true])
   })
 })

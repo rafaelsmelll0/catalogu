@@ -1,5 +1,5 @@
 import { getDatabase } from './database.js'
-import { addMedia, type AddMediaInput } from './queries.js'
+import { addMedia, getMediaById, type AddMediaInput } from './queries.js'
 
 export interface WatchlistRow {
   id:            number
@@ -156,6 +156,53 @@ export function promoteToMedia(watchlistId: number, media: AddMediaInput): numbe
     db.prepare('DELETE FROM watchlist WHERE id = ?').run(watchlistId)
 
     return mediaId
+  })
+
+  return run()
+}
+
+/**
+ * Caminho inverso da promoção: um título do catálogo que na verdade ainda não foi
+ * visto volta para Próximos, levando gêneros, elenco, diretor, imagens, coleção e
+ * os vínculos com listas. Tudo numa transação.
+ */
+export function demoteToWatchlist(mediaId: number): number {
+  const db = getDatabase()
+
+  const run = db.transaction((): number => {
+    const media = getMediaById(mediaId)
+    if (!media) throw new Error('Título não encontrado.')
+
+    const dup = findDuplicateInWatchlist(media.tmdb_id ?? null, media.title, media.release_year, media.tipo)
+    const watchlistId = dup?.id ?? addToWatchlist({
+      title:         media.title,
+      tipo:          media.tipo,
+      release_year:  media.release_year,
+      synopsis:      media.synopsis,
+      cover_path:    media.cover_path,
+      backdrop_path: media.backdrop_path,
+      duration:      media.duration,
+      director:      media.director,
+      genres:        media.genres ?? [],
+      cast:          media.cast ?? [],
+      tmdb_id:       media.tmdb_id,
+    })
+
+    const col = db.prepare('SELECT tmdb_collection_id, collection_checked FROM media WHERE id = ?').get(mediaId) as
+      { tmdb_collection_id: number | null; collection_checked: number } | undefined
+    if (col) {
+      db.prepare('UPDATE watchlist SET tmdb_collection_id = ?, collection_checked = ? WHERE id = ?')
+        .run(col.tmdb_collection_id, col.collection_checked, watchlistId)
+    }
+
+    db.prepare(`
+      INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id, position)
+      SELECT ?, list_id, position FROM media_lists_link WHERE media_id = ?
+    `).run(watchlistId, mediaId)
+
+    // As imagens passam a ser do item de Próximos: apaga só a linha, não os arquivos.
+    db.prepare('DELETE FROM media WHERE id = ?').run(mediaId)
+    return watchlistId
   })
 
   return run()
