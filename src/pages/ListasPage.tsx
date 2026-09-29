@@ -355,7 +355,7 @@ export function ListasPage() {
       </aside>
 
       {/* Área principal */}
-      <section style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <section style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', scrollbarGutter: 'stable' }}>
         {!selected ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: theme.spacing.md }}>
             <AnimatedRoll size={80} style={{ opacity: 0.45 }} />
@@ -376,10 +376,15 @@ export function ListasPage() {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: theme.spacing.md, flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0 }}>
+                // Botões sempre no canto direito; um nome comprido quebra linha no
+                // título em vez de empurrar os botões para baixo.
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: theme.spacing.lg }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <Badge customColor={KIND_COLOR[selected.kind]} size="sm">{LIST_KIND_LABEL[selected.kind].one}</Badge>
-                    <h1 style={{ fontSize: theme.fontSizes.h1, fontWeight: theme.fontWeights.black, fontFamily: theme.fonts.display, marginTop: theme.spacing.xs }}>
+                    <h1 style={{
+                      fontSize: theme.fontSizes.h1, fontWeight: theme.fontWeights.black, fontFamily: theme.fonts.display,
+                      marginTop: theme.spacing.xs, lineHeight: 1.15, overflowWrap: 'anywhere',
+                    }}>
                       {selected.name}
                     </h1>
                     {selected.description && (
@@ -387,11 +392,15 @@ export function ListasPage() {
                     )}
                     <ListSummary list={selected} />
                   </div>
-                  <div style={{ display: 'flex', gap: theme.spacing.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: theme.spacing.sm, alignItems: 'center', flexShrink: 0, paddingTop: theme.spacing.lg }}>
                     <Button onClick={() => setShowAdd(true)}>+ Adicionar</Button>
                     {aiEnabled && <Button variant="secondary" onClick={() => setShowComplete(true)}>✦ Completar com IA</Button>}
-                    <Button variant="ghost" onClick={startEdit}>✎ Editar</Button>
-                    <Button variant="ghost" onClick={() => setShowDelete(true)}>Excluir</Button>
+                    <Tooltip content="Editar lista (nome, descrição e tipo)" side="bottom">
+                      <Button variant="ghost" onClick={startEdit} aria-label="Editar lista" style={{ width: '40px', padding: 0, fontSize: '16px' }}>✎</Button>
+                    </Tooltip>
+                    <Tooltip content="Excluir lista (os títulos continuam no catálogo)" side="bottom">
+                      <Button variant="ghost" onClick={() => setShowDelete(true)} aria-label="Excluir lista" style={{ width: '40px', padding: 0, fontSize: '15px' }}>🗑</Button>
+                    </Tooltip>
                   </div>
                 </div>
               )}
