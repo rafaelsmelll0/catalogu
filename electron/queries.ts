@@ -76,25 +76,31 @@ function getNameMapByMedia(
   nameTable: 'genres' | 'tags',
   linkTable: 'media_genres_link' | 'media_tags_link',
   fkColumn: 'genre_id' | 'tag_id',
+  onlyIds?: number[],
 ): Map<number, string[]> {
   const db = getDatabase()
-  const rows = db.prepare(`
+  const filter = onlyIds ? 'WHERE l.media_id IN (SELECT value FROM json_each(?))' : ''
+  const stmt = db.prepare(`
     SELECT l.media_id AS mediaId, n.name AS name
     FROM ${nameTable} n
     JOIN ${linkTable} l ON l.${fkColumn} = n.id
-  `).all() as { mediaId: number; name: string }[]
+    ${filter}
+  `)
+  const rows = (onlyIds ? stmt.all(JSON.stringify(onlyIds)) : stmt.all()) as { mediaId: number; name: string }[]
   return groupNames(rows)
 }
 
 /** Mapa media_id -> nomes de pessoas por papel (actor/director), em uma única query. */
-function getPeopleMapByMedia(role: 'actor' | 'director'): Map<number, string[]> {
+function getPeopleMapByMedia(role: 'actor' | 'director', onlyIds?: number[]): Map<number, string[]> {
   const db = getDatabase()
-  const rows = db.prepare(`
+  const filter = onlyIds ? 'AND l.media_id IN (SELECT value FROM json_each(?))' : ''
+  const stmt = db.prepare(`
     SELECT l.media_id AS mediaId, p.name AS name
     FROM people p
     JOIN media_people_link l ON l.person_id = p.id
-    WHERE l.role = ?
-  `).all(role) as { mediaId: number; name: string }[]
+    WHERE l.role = ? ${filter}
+  `)
+  const rows = (onlyIds ? stmt.all(role, JSON.stringify(onlyIds)) : stmt.all(role)) as { mediaId: number; name: string }[]
   return groupNames(rows)
 }
 
@@ -352,34 +358,71 @@ export function getAllGenres() {
 
 // -- LISTAS ------------------------------------------------------------------
 
+export type ListKind = 'franquia' | 'saga' | 'tema' | 'livre'
+export type ListSortMode = 'lancamento' | 'manual' | 'titulo' | 'nota'
+
+const LIST_KINDS: ListKind[]     = ['franquia', 'saga', 'tema', 'livre']
+const SORT_MODES: ListSortMode[] = ['lancamento', 'manual', 'titulo', 'nota']
+
 export interface ListRow {
-  id:          number
-  name:        string
-  description: string
-  media_count: number
+  id:                 number
+  name:               string
+  description:        string
+  kind:               ListKind
+  sort_mode:          ListSortMode
+  tmdb_collection_id: number | null
+  media_count:        number
+  /** títulos do catálogo com status "assistido" */
+  watched_count:      number
+  /** média das notas (> 0) dos títulos da lista, ou null */
+  avg_rating:         number | null
+  /** minutos somados dos filmes assistidos */
+  watched_minutes:    number
 }
 
 export function getAllLists(): ListRow[] {
   const db = getDatabase()
   return db.prepare(`
-    SELECT l.*,
+    SELECT l.id, l.name, COALESCE(l.description, '') AS description,
+      l.kind, l.sort_mode, l.tmdb_collection_id,
       (SELECT COUNT(*) FROM media_lists_link ml WHERE ml.list_id = l.id) +
-      (SELECT COUNT(*) FROM watchlist_lists_link wl WHERE wl.list_id = l.id)
-      as media_count
+      (SELECT COUNT(*) FROM watchlist_lists_link wl WHERE wl.list_id = l.id) AS media_count,
+      (SELECT COUNT(*) FROM media_lists_link ml JOIN media m ON m.id = ml.media_id
+        WHERE ml.list_id = l.id AND m.watched_status = 'assistido') AS watched_count,
+      (SELECT ROUND(AVG(m.rating), 1) FROM media_lists_link ml JOIN media m ON m.id = ml.media_id
+        WHERE ml.list_id = l.id AND m.rating > 0) AS avg_rating,
+      (SELECT COALESCE(SUM(m.duration), 0) FROM media_lists_link ml JOIN media m ON m.id = ml.media_id
+        WHERE ml.list_id = l.id AND m.watched_status = 'assistido' AND m.tipo = 'filme' AND m.duration > 0) AS watched_minutes
     FROM lists l
-    ORDER BY l.name
+    ORDER BY l.name COLLATE NOCASE
   `).all() as ListRow[]
 }
 
-export function createList(name: string, description = ''): number {
+export function createList(name: string, description = '', kind: ListKind = 'livre'): number {
   const db = getDatabase()
-  const r = db.prepare('INSERT INTO lists (name, description) VALUES (?, ?)').run(name, description)
+  const k = LIST_KINDS.includes(kind) ? kind : 'livre'
+  const r = db.prepare("INSERT INTO lists (name, description, kind, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)").run(name, description, k)
   return r.lastInsertRowid as number
 }
 
-export function updateList(id: number, name: string, description: string): boolean {
+export interface UpdateListInput {
+  name?:               string
+  description?:        string
+  kind?:               ListKind
+  sort_mode?:          ListSortMode
+  tmdb_collection_id?: number | null
+}
+
+export function updateList(id: number, patch: UpdateListInput): boolean {
   const db = getDatabase()
-  db.prepare('UPDATE lists SET name = ?, description = ? WHERE id = ?').run(name, description, id)
+  const sets: string[] = []
+  const params: Record<string, unknown> = { id }
+  if (patch.name !== undefined)        { sets.push('name = @name'); params.name = patch.name }
+  if (patch.description !== undefined) { sets.push('description = @description'); params.description = patch.description }
+  if (patch.kind && LIST_KINDS.includes(patch.kind))            { sets.push('kind = @kind'); params.kind = patch.kind }
+  if (patch.sort_mode && SORT_MODES.includes(patch.sort_mode))  { sets.push('sort_mode = @sort_mode'); params.sort_mode = patch.sort_mode }
+  if (patch.tmdb_collection_id !== undefined) { sets.push('tmdb_collection_id = @cid'); params.cid = patch.tmdb_collection_id }
+  if (sets.length) db.prepare(`UPDATE lists SET ${sets.join(', ')} WHERE id = @id`).run(params)
   return true
 }
 
@@ -390,26 +433,54 @@ export function deleteList(id: number): boolean {
 }
 
 export interface MediaInListRow extends MediaRow {
-  isProximo:   boolean
+  isProximo:    boolean
   watchlistId?: number
+  position:     number | null
+  tmdb_collection_id?: number | null
+}
+
+/** Ordena os itens de uma lista conforme o modo escolhido (puro, exportado para testes). */
+export function sortListItems<T extends { title: string; release_year?: string | null; rating?: number | null; position: number | null }>(
+  items: T[], mode: ListSortMode,
+): T[] {
+  const byTitle = (a: T, b: T) => a.title.localeCompare(b.title, 'pt-BR')
+  const year    = (t: T) => Number(t.release_year) || 9999
+  const sorted  = [...items]
+  switch (mode) {
+    case 'titulo': return sorted.sort(byTitle)
+    case 'nota':   return sorted.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || byTitle(a, b))
+    case 'manual':
+      // Itens sem posição (adicionados antes de ordenar) vão para o fim, por ano.
+      return sorted.sort((a, b) =>
+        (a.position ?? Infinity) - (b.position ?? Infinity) || year(a) - year(b) || byTitle(a, b))
+    default:
+      return sorted.sort((a, b) => year(a) - year(b) || byTitle(a, b))
+  }
 }
 
 export function getMediaInList(listId: number): MediaInListRow[] {
   const db = getDatabase()
+  const list = db.prepare('SELECT sort_mode FROM lists WHERE id = ?').get(listId) as { sort_mode: ListSortMode } | undefined
 
   const mediaRows = db.prepare(`
-    SELECT m.* FROM media m
+    SELECT m.*, ml.position AS position FROM media m
     JOIN media_lists_link ml ON ml.media_id = m.id
     WHERE ml.list_id = ?
-    ORDER BY m.title
-  `).all(listId) as MediaRow[]
+  `).all(listId) as (MediaRow & { position: number | null })[]
+
+  // Associações em lote só para os títulos da lista (evita 4 consultas por título)
+  const ids = mediaRows.map(r => r.id)
+  const genres    = getNameMapByMedia('genres', 'media_genres_link', 'genre_id', ids)
+  const tags      = getNameMapByMedia('tags',   'media_tags_link',   'tag_id',   ids)
+  const cast      = getPeopleMapByMedia('actor', ids)
+  const directors = getPeopleMapByMedia('director', ids)
 
   const catalogItems: MediaInListRow[] = mediaRows.map(row => ({
     ...row,
-    genres:    getGenresForMedia(row.id),
-    tags:      getTagsForMedia(row.id),
-    cast:      getCastForMedia(row.id),
-    director:  getDirectorForMedia(row.id),
+    genres:    genres.get(row.id)    ?? [],
+    tags:      tags.get(row.id)      ?? [],
+    cast:      cast.get(row.id)      ?? [],
+    director:  directors.get(row.id)?.[0],
     isProximo: false,
   }))
 
@@ -417,14 +488,14 @@ export function getMediaInList(listId: number): MediaInListRow[] {
     id: number; title: string; tipo: string; release_year: string
     synopsis: string; cover_path: string; backdrop_path: string
     duration: number; director: string; genres: string; cast: string
-    tmdb_id: number; created_at: string
+    tmdb_id: number; created_at: string; position: number | null
+    tmdb_collection_id: number | null
   }
 
   const watchlistRows = db.prepare(`
-    SELECT w.* FROM watchlist w
+    SELECT w.*, wl.position AS position FROM watchlist w
     JOIN watchlist_lists_link wl ON wl.watchlist_id = w.id
     WHERE wl.list_id = ?
-    ORDER BY w.title
   `).all(listId) as WatchlistLinkRaw[]
 
   const watchlistItems: MediaInListRow[] = watchlistRows.map(row => ({
@@ -440,21 +511,34 @@ export function getMediaInList(listId: number): MediaInListRow[] {
     genres:         JSON.parse(row.genres ?? '[]'),
     cast:           JSON.parse(row.cast   ?? '[]'),
     tmdb_id:        row.tmdb_id,
+    tmdb_collection_id: row.tmdb_collection_id,
     created_at:     row.created_at,
     watched_status: 'nao_assistido' as const,
     isProximo:      true,
     watchlistId:    row.id,
+    position:       row.position,
     tags:           [],
   }))
 
-  return [...catalogItems, ...watchlistItems].sort((a, b) =>
-    a.title.localeCompare(b.title, 'pt-BR')
-  )
+  return sortListItems([...catalogItems, ...watchlistItems], list?.sort_mode ?? 'lancamento')
+}
+
+/** Próxima posição livre na lista (novos itens entram no fim da ordem manual). */
+function nextPosition(listId: number): number {
+  const db = getDatabase()
+  const row = db.prepare(`
+    SELECT MAX(p) AS p FROM (
+      SELECT position AS p FROM media_lists_link WHERE list_id = ?
+      UNION ALL
+      SELECT position AS p FROM watchlist_lists_link WHERE list_id = ?
+    )
+  `).get(listId, listId) as { p: number | null }
+  return (row.p ?? 0) + 1
 }
 
 export function addMediaToList(mediaId: number, listId: number): boolean {
   const db = getDatabase()
-  db.prepare('INSERT OR IGNORE INTO media_lists_link (media_id, list_id) VALUES (?, ?)').run(mediaId, listId)
+  db.prepare('INSERT OR IGNORE INTO media_lists_link (media_id, list_id, position) VALUES (?, ?, ?)').run(mediaId, listId, nextPosition(listId))
   return true
 }
 
@@ -466,7 +550,7 @@ export function removeMediaFromList(mediaId: number, listId: number): boolean {
 
 export function addWatchlistItemToList(watchlistId: number, listId: number): boolean {
   const db = getDatabase()
-  db.prepare('INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id) VALUES (?, ?)').run(watchlistId, listId)
+  db.prepare('INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id, position) VALUES (?, ?, ?)').run(watchlistId, listId, nextPosition(listId))
   return true
 }
 
@@ -474,6 +558,48 @@ export function removeWatchlistItemFromList(watchlistId: number, listId: number)
   const db = getDatabase()
   db.prepare('DELETE FROM watchlist_lists_link WHERE watchlist_id = ? AND list_id = ?').run(watchlistId, listId)
   return true
+}
+
+/** Referência a um item de lista: título do catálogo ou item de Próximos. */
+export interface ListEntryRef {
+  kind: 'media' | 'watchlist'
+  id:   number
+}
+
+/** Adiciona vários itens de uma vez (seleção múltipla), numa transação. */
+export function addManyToList(listId: number, entries: ListEntryRef[]): number {
+  const db = getDatabase()
+  let added = 0
+  db.transaction(() => {
+    for (const e of entries) {
+      const r = e.kind === 'media'
+        ? db.prepare('INSERT OR IGNORE INTO media_lists_link (media_id, list_id, position) VALUES (?, ?, ?)').run(e.id, listId, nextPosition(listId))
+        : db.prepare('INSERT OR IGNORE INTO watchlist_lists_link (watchlist_id, list_id, position) VALUES (?, ?, ?)').run(e.id, listId, nextPosition(listId))
+      added += r.changes
+    }
+  })()
+  return added
+}
+
+/** Salva a ordem manual (arrastar e soltar) e passa a lista para o modo manual. */
+export function reorderList(listId: number, ordered: ListEntryRef[]): boolean {
+  const db = getDatabase()
+  const setMedia = db.prepare('UPDATE media_lists_link SET position = ? WHERE list_id = ? AND media_id = ?')
+  const setWatch = db.prepare('UPDATE watchlist_lists_link SET position = ? WHERE list_id = ? AND watchlist_id = ?')
+  db.transaction(() => {
+    ordered.forEach((e, i) => (e.kind === 'media' ? setMedia : setWatch).run(i + 1, listId, e.id))
+    db.prepare("UPDATE lists SET sort_mode = 'manual' WHERE id = ?").run(listId)
+  })()
+  return true
+}
+
+/** Ids das listas que contêm um título (para os detalhes e o seletor de listas). */
+export function getListIdsFor(entry: ListEntryRef): number[] {
+  const db = getDatabase()
+  const rows = entry.kind === 'media'
+    ? db.prepare('SELECT list_id FROM media_lists_link WHERE media_id = ?').all(entry.id)
+    : db.prepare('SELECT list_id FROM watchlist_lists_link WHERE watchlist_id = ?').all(entry.id)
+  return (rows as { list_id: number }[]).map(r => r.list_id)
 }
 
 // -- ESTATÍSTICAS ------------------------------------------------------------

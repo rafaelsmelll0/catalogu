@@ -215,3 +215,105 @@ PEDIDO AGORA: ${request.count} sugestões, ${tipoTxt}.${request.pedido.trim() ? 
     },
   ]
 }
+
+// ─── Listas ─────────────────────────────────────────────────────────────────
+
+const KIND_LABEL: Record<string, string> = {
+  franquia: 'franquia (filmes de uma mesma franquia)',
+  saga:     'saga/trilogia',
+  tema:     'lista temática',
+  livre:    'lista livre',
+}
+
+export interface RawListMember { titulo: string; ano?: number | string }
+
+export interface RawCompletion {
+  do_catalogo?: RawListMember[]
+  novos?:       RawSuggestion[]
+}
+
+export function buildCompleteListMessages(input: {
+  catalog:   CatalogEntry[]
+  watchlist: SimpleTitle[]
+  feedback:  FeedbackEntry[]
+  list:      { name: string; kind: string; description: string; members: SimpleTitle[] }
+  budgetChars: number
+}): ChatMessage[] {
+  const { list } = input
+  const fmt = (xs: SimpleTitle[]) => xs.length ? xs.map(t => `${t.title}${yearOf(t)}`).join('; ') : '(nenhum)'
+  const dismissed = input.feedback.filter(f => f.verdict === 'dismissed')
+
+  return [
+    {
+      role: 'system',
+      content: `${PERSONA}
+
+Tarefa: ajudar a COMPLETAR uma lista do usuário. Entenda o critério da lista pelo nome, descrição e pelos títulos que já estão nela.
+
+Regras:
+- "do_catalogo": títulos que JÁ ESTÃO no catálogo (ou em Próximos) dele e se encaixam no critério, mas ainda não estão na lista.
+  Use o título EXATAMENTE como aparece no catálogo, com o ano.
+- "novos": até 8 títulos que ele AINDA NÃO TEM e que se encaixam no critério, priorizando o que combina com o gosto dele
+  (notas e observações). Só títulos reais, com ano correto. "por_que": 1 a 2 frases ligando à lista e ao gosto dele.
+- Se for franquia/saga, inclua em "novos" os filmes oficiais que faltam (na ordem de lançamento), inclusive derivados.
+- Não repita títulos que já estão na lista. Não inclua os recusados.
+
+Responda APENAS com JSON:
+{"do_catalogo": [{"titulo": "", "ano": 2000}], "novos": [{"titulo": "", "titulo_original": "", "ano": 2000, "tipo": "filme", "por_que": ""}]}`,
+    },
+    {
+      role: 'user',
+      content: `CATÁLOGO DELE (nota · título (ano) · gêneros · diretor · tags · listas — "observações"):
+${formatCatalog(input.catalog, input.budgetChars)}
+
+EM PRÓXIMOS: ${fmt(input.watchlist)}
+RECUSADOS ANTES: ${fmt(dismissed)}
+
+LISTA A COMPLETAR: "${list.name}" — ${KIND_LABEL[list.kind] ?? list.kind}${list.description ? `\nDescrição: ${list.description}` : ''}
+Já está nela: ${fmt(list.members)}`,
+    },
+  ]
+}
+
+export interface RawListSuggestion {
+  nome:       string
+  tipo?:      string
+  descricao?: string
+  titulos?:   RawListMember[]
+}
+
+export function buildSuggestListsMessages(input: {
+  catalog:       CatalogEntry[]
+  existingLists: { name: string; kind: string }[]
+  budgetChars:   number
+}): ChatMessage[] {
+  const existing = input.existingLists.length
+    ? input.existingLists.map(l => `${l.name} (${l.kind})`).join('; ')
+    : '(nenhuma)'
+  return [
+    {
+      role: 'system',
+      content: `${PERSONA}
+
+Tarefa: propor NOVAS listas para organizar o catálogo dele, usando SOMENTE títulos que já estão no catálogo.
+
+Regras:
+- De 4 a 8 listas. Cada uma com pelo menos 3 títulos do catálogo (use o título EXATAMENTE como aparece, com o ano).
+- Misture tipos: "franquia" (mesma franquia), "saga" (trilogias/sagas), "tema" (um tema, subgênero, clima, época, diretor...).
+- Prefira temas específicos e com personalidade ("Isolamento no gelo", "Terror nacional", "Anos 80 de efeitos práticos")
+  a categorias genéricas ("Filmes de ação"). Pode usar as notas/observações dele (ex.: "Os que você mais odiou").
+- Não repita nem imite as listas que ele já tem.
+- "descricao": 1 frase dizendo o critério.
+
+Responda APENAS com JSON:
+{"listas": [{"nome": "", "tipo": "tema", "descricao": "", "titulos": [{"titulo": "", "ano": 2000}]}]}`,
+    },
+    {
+      role: 'user',
+      content: `CATÁLOGO DELE (nota · título (ano) · gêneros · diretor · tags · listas — "observações"):
+${formatCatalog(input.catalog, input.budgetChars)}
+
+LISTAS QUE ELE JÁ TEM: ${existing}`,
+    },
+  ]
+}

@@ -205,4 +205,61 @@ function initSchema(db: Database.Database) {
       )
     `)
   }
+
+  migrateListsV2(db)
+
+  // Coleções do TMDB (franquias): em qual coleção cada filme está. collection_checked
+  // marca quem já foi consultado (NULL em tmdb_collection_id = não pertence a nenhuma).
+  for (const table of ['media', 'watchlist']) {
+    if (!hasColumn(db, table, 'tmdb_collection_id')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN tmdb_collection_id INTEGER`)
+      db.exec(`ALTER TABLE ${table} ADD COLUMN collection_checked INTEGER NOT NULL DEFAULT 0`)
+    }
+  }
+}
+
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some(c => c.name === column)
+}
+
+export const LIST_KINDS = ['franquia', 'saga', 'tema', 'livre'] as const
+export type ListKind = typeof LIST_KINDS[number]
+
+/**
+ * Listas v2: tipo (franquia/saga/tema/livre), modo de ordenação, vínculo com uma
+ * coleção do TMDB e posição manual dos itens.
+ *
+ * Na primeira execução converte a convenção antiga de nome: "Franquia | Alien"
+ * vira a lista "Alien" do tipo franquia (se o nome curto já existir, mantém o
+ * nome original). As demais listas existentes eram temáticas e viram "tema".
+ */
+function migrateListsV2(db: Database.Database) {
+  if (hasColumn(db, 'lists', 'kind')) return
+
+  db.transaction(() => {
+    db.exec(`
+      ALTER TABLE lists ADD COLUMN kind TEXT NOT NULL DEFAULT 'livre';
+      ALTER TABLE lists ADD COLUMN sort_mode TEXT NOT NULL DEFAULT 'lancamento';
+      ALTER TABLE lists ADD COLUMN tmdb_collection_id INTEGER;
+      ALTER TABLE lists ADD COLUMN created_at TIMESTAMP;
+      ALTER TABLE media_lists_link ADD COLUMN position INTEGER;
+      ALTER TABLE watchlist_lists_link ADD COLUMN position INTEGER;
+    `)
+
+    const lists = db.prepare('SELECT id, name FROM lists').all() as { id: number; name: string }[]
+    const taken = new Set(lists.map(l => l.name.toLowerCase()))
+    const setKind = db.prepare('UPDATE lists SET kind = ?, name = ? WHERE id = ?')
+
+    for (const l of lists) {
+      const m = l.name.match(/^\s*franquia\s*[|:\-–]\s*(.+)$/i)
+      if (m) {
+        const short = m[1].trim()
+        const name = taken.has(short.toLowerCase()) ? l.name : short
+        taken.add(name.toLowerCase())
+        setKind.run('franquia', name, l.id)
+      } else {
+        setKind.run('tema', l.name, l.id)
+      }
+    }
+  })()
 }

@@ -336,7 +336,7 @@ export function ConfigPage() {
         </h2>
 
         {[
-          { keys: ['Ctrl', 'K'],      desc: 'Abrir busca' },
+          { keys: ['Ctrl', 'K'],      desc: 'Buscar (título, diretor, elenco, observações…)' },
           { keys: ['Ctrl', 'N'],      desc: 'Adicionar mídia' },
           { keys: ['1 / 2 / 3'],      desc: 'No Adicionar: Filme / Série / Manual' },
           { keys: ['Esc'],            desc: 'Fechar modal / Fechar busca' },

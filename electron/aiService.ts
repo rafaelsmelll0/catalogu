@@ -1,14 +1,17 @@
 import { getDatabase } from './database.js'
 import { getAllMedia, addMedia, type AddMediaInput } from './queries.js'
-import { getAllWatchlist, addToWatchlist, findDuplicateInWatchlist, promoteToMedia } from './watchlistQueries.js'
+import { getAllWatchlist, findDuplicateInWatchlist, promoteToMedia } from './watchlistQueries.js'
+import { loadDetails, addTmdbToWatchlist } from './tmdbImport.js'
 import { findDuplicateInMedia } from './queries.js'
-import { getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl, searchForMatch, type TmdbMatchCandidate } from './tmdb.js'
+import { searchForMatch, type TmdbMatchCandidate } from './tmdb.js'
 import { titlesMatch, pickCandidate } from './aiMatch.js'
 import { localizeMediaImages } from './imageStore.js'
 import { getActiveConfig } from './aiSettings.js'
 import { chatJson, AiError, type AiUsage } from './aiClient.js'
+import { getAllLists, getMediaInList, createList, addManyToList, type ListKind, type ListEntryRef } from './queries.js'
 import {
-  buildProfileMessages, buildRecommendMessages,
+  buildProfileMessages, buildRecommendMessages, buildCompleteListMessages, buildSuggestListsMessages,
+  type RawCompletion, type RawListSuggestion, type RawListMember,
   type CatalogEntry, type FeedbackEntry, type RawSuggestion, type RecommendRequest, type SimpleTitle,
 } from './aiPrompts.js'
 
@@ -55,6 +58,11 @@ export function setFeedback(tmdbId: number, tipo: 'filme' | 'serie', title: stri
 // ─── Contexto do catálogo ───────────────────────────────────────────────────
 
 function loadCatalog(): CatalogEntry[] {
+  return loadCatalogRows().map(r => r.entry)
+}
+
+/** Catálogo no formato do prompt, junto com o id e a capa de cada título. */
+function loadCatalogRows(): { id: number; cover_path: string | null; entry: CatalogEntry }[] {
   const db = getDatabase()
   const listRows = db.prepare(`
     SELECT ml.media_id AS id, l.name AS name
@@ -66,7 +74,7 @@ function loadCatalog(): CatalogEntry[] {
   // Mais antigos primeiro: ordem estável ajuda o cache de prefixo do provedor.
   return getAllMedia()
     .sort((a, b) => a.id - b.id)
-    .map(m => ({
+    .map(m => ({ id: m.id, cover_path: m.cover_path ?? null, entry: {
       title:          m.title,
       year:           m.release_year ?? null,
       tipo:           m.tipo,
@@ -78,7 +86,7 @@ function loadCatalog(): CatalogEntry[] {
       director:       m.director ?? null,
       observations:   m.observations ?? null,
       watched_date:   m.watched_date ?? null,
-    }))
+    } }))
 }
 
 function requireConfig() {
@@ -204,22 +212,6 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out
 }
 
-async function loadDetails(tmdbId: number, tipo: 'filme' | 'serie') {
-  const d = tipo === 'filme' ? await getMovieDetails(tmdbId) : await getTvDetails(tmdbId)
-  return {
-    title:        d.title ?? d.name ?? '',
-    year:         (d.release_date ?? d.first_air_date ?? '').slice(0, 4),
-    overview:     d.overview ?? '',
-    genres:       (d.genres ?? []).map(g => g.name),
-    duration:     (tipo === 'filme' ? d.runtime : d.number_of_episodes) || null,
-    director:     d.credits?.crew?.find(c => c.job === 'Director')?.name ?? null,
-    cast:         (d.credits?.cast ?? []).slice(0, 5).map(c => c.name),
-    posterUrl:    getPosterUrl(d.poster_path),
-    backdropUrl:  d.backdrop_path ? getBackdropUrl(d.backdrop_path) : null,
-    voteAverage:  (d as { vote_average?: number }).vote_average ?? null,
-  }
-}
-
 export async function recommend(request: RecommendRequest): Promise<RecommendResult> {
   const cfg = requireConfig()
 
@@ -251,10 +243,35 @@ export async function recommend(request: RecommendRequest): Promise<RecommendRes
   )
   if (raw.length === 0) throw new AiError('A IA não trouxe sugestões desta vez. Tente de novo.')
 
+  const resolved = await resolveSuggestionsRaw(raw, catalog, feedback)
+  const items = resolved.filter((x): x is Suggestion => !!x).slice(0, count)
+  const result: RecommendResult = {
+    generatedAt: new Date().toISOString(),
+    request:     { ...request, count },
+    items,
+    discarded:   raw.length - resolved.filter(Boolean).length,
+    usage,
+  }
+  // Rodada vazia não apaga as sugestões anteriores (que podem ter itens ainda não respondidos).
+  if (items.length > 0) kvSet(KV_LAST_RECS, result)
+  return result
+}
+
+async function resolveSuggestions(
+  raw: RawSuggestion[], catalog: CatalogEntry[], feedback: (FeedbackEntry & { tmdb_id: number })[],
+): Promise<Suggestion[]> {
+  const valid = raw.filter(s => s && s.titulo && (s.tipo === 'filme' || s.tipo === 'serie'))
+  return (await resolveSuggestionsRaw(valid, catalog, feedback)).filter((x): x is Suggestion => !!x)
+}
+
+/** Confere cada sugestão no TMDB e descarta inexistentes, repetidas e o que já está no catálogo/Próximos. */
+async function resolveSuggestionsRaw(
+  raw: RawSuggestion[], catalog: CatalogEntry[], feedback: (FeedbackEntry & { tmdb_id: number })[],
+): Promise<(Suggestion | null)[]> {
   const blocked = new Set(feedback.map(f => `${f.tipo}:${f.tmdb_id}`))
   const seenIds = new Set<string>()
 
-  const resolved = await mapLimit(raw, 4, async s => {
+  return mapLimit(raw, 4, async s => {
     try {
       const match = await resolveOnTmdb(s)
       if (!match) return null
@@ -287,42 +304,12 @@ export async function recommend(request: RecommendRequest): Promise<RecommendRes
       return null
     }
   })
-
-  const items = resolved.filter((x): x is Suggestion => !!x).slice(0, count)
-  const result: RecommendResult = {
-    generatedAt: new Date().toISOString(),
-    request:     { ...request, count },
-    items,
-    discarded:   raw.length - resolved.filter(Boolean).length,
-    usage,
-  }
-  // Rodada vazia não apaga as sugestões anteriores (que podem ter itens ainda não respondidos).
-  if (items.length > 0) kvSet(KV_LAST_RECS, result)
-  return result
 }
 
 /** "+ Próximos" numa sugestão: busca os detalhes completos e salva na fila. */
-export async function addSuggestionToWatchlist(tmdbId: number, tipo: 'filme' | 'serie'): Promise<{ success: boolean; error?: string }> {
-  const d = await loadDetails(tmdbId, tipo)
-  try {
-    addToWatchlist(await localizeMediaImages({
-      title:         d.title,
-      tipo,
-      release_year:  d.year || undefined,
-      synopsis:      d.overview || undefined,
-      cover_path:    d.posterUrl ?? undefined,
-      backdrop_path: d.backdropUrl ?? undefined,
-      duration:      d.duration ?? undefined,
-      director:      d.director ?? undefined,
-      genres:        d.genres,
-      cast:          d.cast,
-      tmdb_id:       tmdbId,
-    }))
-  } catch (err) {
-    if (!String(err).includes('DUPLICATE')) throw err
-    // Já estava em Próximos: segue marcando como adicionado.
-  }
-  setFeedback(tmdbId, tipo, d.title, d.year || null, 'added')
+export async function addSuggestionToWatchlist(tmdbId: number, tipo: 'filme' | 'serie'): Promise<{ success: boolean }> {
+  const { title, year } = await addTmdbToWatchlist(tmdbId, tipo)
+  setFeedback(tmdbId, tipo, title, year || null, 'added')
   return { success: true }
 }
 
@@ -373,4 +360,124 @@ export async function addSuggestionToCatalog(tmdbId: number, tipo: 'filme' | 'se
   getDatabase().prepare('DELETE FROM ai_feedback WHERE tmdb_id = ? AND tipo = ?').run(tmdbId, tipo)
   updateStoredStatus(tmdbId, tipo, 'cataloged')
   return { mediaId }
+}
+
+// ─── IA nas listas ──────────────────────────────────────────────────────────
+
+export interface ListCandidateRef {
+  kind:       'media' | 'watchlist'
+  id:         number
+  title:      string
+  year:       string | null
+  cover_path: string | null
+  rating:     number | null
+}
+
+/** Casa um título citado pela IA com o catálogo/Próximos (título + ano ±1). */
+function matchOwned(
+  m: RawListMember,
+  owned: ListCandidateRef[],
+): ListCandidateRef | null {
+  const year = Number(m.ano) || undefined
+  return owned.find(o =>
+    titlesMatch(o.title, m.titulo) && (!year || !o.year || Math.abs(Number(o.year) - year) <= 1),
+  ) ?? null
+}
+
+function ownedRefs(): ListCandidateRef[] {
+  const media = loadCatalogRows().map<ListCandidateRef>(r => ({
+    kind: 'media', id: r.id, title: r.entry.title, year: r.entry.year ?? null,
+    cover_path: r.cover_path, rating: r.entry.rating ?? null,
+  }))
+  const px = getAllWatchlist().map<ListCandidateRef>(w => ({
+    kind: 'watchlist', id: w.id, title: w.title, year: w.release_year ?? null,
+    cover_path: w.cover_path ?? null, rating: null,
+  }))
+  return [...media, ...px]
+}
+
+export interface ListCompletion {
+  fromCatalog: ListCandidateRef[]
+  discover:    Suggestion[]
+}
+
+export async function completeList(listId: number): Promise<ListCompletion> {
+  const cfg  = requireConfig()
+  const list = getAllLists().find(l => l.id === listId)
+  if (!list) throw new AiError('Lista não encontrada.')
+
+  const members   = getMediaInList(listId)
+  const catalog   = loadCatalog()
+  const watchlist = getAllWatchlist()
+  const feedback  = loadFeedback()
+
+  const { data } = await chatJson<RawCompletion>(cfg, buildCompleteListMessages({
+    catalog,
+    watchlist: watchlist.map<SimpleTitle>(w => ({ title: w.title, year: w.release_year, tipo: w.tipo })),
+    feedback,
+    list: {
+      name: list.name, kind: list.kind, description: list.description,
+      members: members.map<SimpleTitle>(m => ({ title: m.title, year: m.release_year, tipo: m.tipo })),
+    },
+    budgetChars: cfg.info.contextChars,
+  }), { temperature: 0.5, maxTokens: cfg.provider === 'groq' ? 2500 : 6000 })
+
+  const inList = new Set(members.map(m => m.isProximo ? `watchlist:${m.watchlistId}` : `media:${m.id}`))
+  const owned  = ownedRefs()
+  const fromCatalog: ListCandidateRef[] = []
+  for (const m of data.do_catalogo ?? []) {
+    const hit = m?.titulo ? matchOwned(m, owned) : null
+    if (hit && !inList.has(`${hit.kind}:${hit.id}`) && !fromCatalog.includes(hit)) fromCatalog.push(hit)
+  }
+
+  const discover = await resolveSuggestions(data.novos ?? [], catalog, feedback)
+  return { fromCatalog, discover: discover.slice(0, 8) }
+}
+
+export interface ListProposal {
+  name:        string
+  kind:        ListKind
+  description: string
+  items:       ListCandidateRef[]
+}
+
+export async function suggestLists(): Promise<ListProposal[]> {
+  const cfg      = requireConfig()
+  const existing = getAllLists()
+  const { data } = await chatJson<{ listas?: RawListSuggestion[] }>(cfg, buildSuggestListsMessages({
+    catalog:       loadCatalog(),
+    existingLists: existing.map(l => ({ name: l.name, kind: l.kind })),
+    budgetChars:   cfg.info.contextChars,
+  }), { temperature: 0.8, maxTokens: cfg.provider === 'groq' ? 2500 : 6000 })
+
+  const taken = new Set(existing.map(l => l.name.toLowerCase()))
+  const owned = ownedRefs().filter(o => o.kind === 'media')
+  const kinds: ListKind[] = ['franquia', 'saga', 'tema', 'livre']
+
+  const proposals: ListProposal[] = []
+  for (const l of data.listas ?? []) {
+    const name = l?.nome?.trim()
+    if (!name || taken.has(name.toLowerCase())) continue
+    const items: ListCandidateRef[] = []
+    for (const m of l.titulos ?? []) {
+      const hit = m?.titulo ? matchOwned(m, owned) : null
+      if (hit && !items.includes(hit)) items.push(hit)
+    }
+    if (items.length < 3) continue
+    proposals.push({
+      name,
+      kind:        kinds.includes(l.tipo as ListKind) ? l.tipo as ListKind : 'tema',
+      description: l.descricao?.trim() ?? '',
+      items,
+    })
+    taken.add(name.toLowerCase())
+  }
+  if (proposals.length === 0) throw new AiError('A IA não conseguiu montar listas novas desta vez. Tente de novo.')
+  return proposals
+}
+
+export function createListFromProposal(p: { name: string; kind: ListKind; description: string; items: ListEntryRef[] }): { listId: number } {
+  const listId = createList(p.name.trim(), p.description.trim(), p.kind)
+  addManyToList(listId, p.items)
+  return { listId }
 }

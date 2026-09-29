@@ -5,10 +5,13 @@ import { useMediaStore } from '../store/mediaStore.ts'
 import { EditMediaModal } from './EditMediaModal.tsx'
 import { formatDateBR } from '../lib/date.ts'
 import { Modal, Button, Badge } from './ui/index.ts'
+import { TitleListsRow } from './TitleListsRow.tsx'
 
 interface Props {
   media:   Media
   onClose: () => void
+  /** Aberto de dentro de uma lista: mostra "Remover desta lista". */
+  listContext?: { name: string; onRemove: () => void }
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -54,7 +57,7 @@ function RatingDisplay({ rating }: { rating: number }) {
   )
 }
 
-export function DetailsModal({ media, onClose }: Props) {
+export function DetailsModal({ media, onClose, listContext }: Props) {
   const { deleteMedia } = useMediaStore()
   const [showEdit, setShowEdit]                   = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -295,6 +298,11 @@ export function DetailsModal({ media, onClose }: Props) {
               </div>
             )}
 
+            {/* Listas */}
+            <div style={{ marginTop: theme.spacing.md }}>
+              <TitleListsRow target={{ kind: 'media', id: media.id, title: media.title }} onNavigate={onClose} />
+            </div>
+
             {/* Ações */}
             <div style={{
               display: 'flex', gap: theme.spacing.sm,
@@ -305,8 +313,13 @@ export function DetailsModal({ media, onClose }: Props) {
               <Button onClick={() => setShowEdit(true)}>
                 ✎ Editar
               </Button>
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)}>
-                Excluir
+              {listContext && (
+                <Button variant="ghost" onClick={listContext.onRemove}>
+                  Remover de "{listContext.name}"
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} style={{ marginLeft: 'auto' }}>
+                Excluir do catálogo
               </Button>
             </div>
           </div>

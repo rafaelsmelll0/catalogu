@@ -10,6 +10,8 @@ import {
   getAllLists, createList, updateList, deleteList,
   getMediaInList, addMediaToList, removeMediaFromList,
   addWatchlistItemToList, removeWatchlistItemFromList,
+  addManyToList, reorderList, getListIdsFor,
+  type ListKind, type UpdateListInput, type ListEntryRef,
   findDuplicateInMedia,
 } from './queries.js'
 import { searchMovies, searchSeries, getMovieDetails, getTvDetails, getPosterUrl, getBackdropUrl } from './tmdb.js'
@@ -20,11 +22,14 @@ import {
 } from './watchlistQueries.js'
 import type { AddMediaInput } from './queries.js'
 import { exportBackup, mergeBackup } from './backup.js'
+import { scanCollections, countPendingScan, getFranchises, getFranchiseForList, createListForFranchise } from './collections.js'
+import { addTmdbToWatchlist } from './tmdbImport.js'
 import { getPublicSettings, saveSettings, getActiveConfig, type SaveSettingsInput } from './aiSettings.js'
 import { listModels, AiError } from './aiClient.js'
 import {
   getProfile, generateProfile, saveProfileText,
   recommend, getLastRecommendations, setFeedback, addSuggestionToWatchlist, addSuggestionToCatalog,
+  completeList, suggestLists, createListFromProposal,
   type Verdict, type WatchedFields,
 } from './aiService.js'
 import type { RecommendRequest } from './aiPrompts.js'
@@ -70,14 +75,35 @@ function registerIpcHandlers() {
   ipcMain.handle('tmdb:posterUrl',    (_e, p: string)     => getPosterUrl(p))
   ipcMain.handle('tmdb:backdropUrl',  (_e, p: string)     => getBackdropUrl(p))
   ipcMain.handle('lists:getAll',      () => getAllLists())
-  ipcMain.handle('lists:create',      (_e, name: string, desc: string) => createList(name, desc))
-  ipcMain.handle('lists:update',      (_e, id: number, name: string, desc: string) => updateList(id, name, desc))
+  ipcMain.handle('lists:create',      (_e, name: string, desc: string, kind?: ListKind) => createList(name, desc, kind))
+  ipcMain.handle('lists:update',      (_e, id: number, patch: UpdateListInput) => updateList(id, patch))
   ipcMain.handle('lists:delete',      (_e, id: number) => deleteList(id))
   ipcMain.handle('lists:getMedia',    (_e, listId: number) => getMediaInList(listId))
   ipcMain.handle('lists:addMedia',    (_e, mediaId: number, listId: number) => addMediaToList(mediaId, listId))
   ipcMain.handle('lists:removeMedia',          (_e, mediaId: number, listId: number)     => removeMediaFromList(mediaId, listId))
   ipcMain.handle('lists:addWatchlistItem',    (_e, watchlistId: number, listId: number) => addWatchlistItemToList(watchlistId, listId))
   ipcMain.handle('lists:removeWatchlistItem', (_e, watchlistId: number, listId: number) => removeWatchlistItemFromList(watchlistId, listId))
+  ipcMain.handle('lists:addMany',     (_e, listId: number, entries: ListEntryRef[]) => addManyToList(listId, entries))
+  ipcMain.handle('lists:reorder',     (_e, listId: number, ordered: ListEntryRef[]) => reorderList(listId, ordered))
+  ipcMain.handle('lists:idsFor',      (_e, entry: ListEntryRef) => getListIdsFor(entry))
+
+  // Franquias (coleções do TMDB)
+  ipcMain.handle('franchises:pendingScan', () => countPendingScan())
+  ipcMain.handle('franchises:scan', (event) => scanCollections(p => {
+    if (!event.sender.isDestroyed()) event.sender.send('franchises:progress', p)
+  }))
+  ipcMain.handle('franchises:getAll',     () => getFranchises())
+  ipcMain.handle('franchises:forList',    (_e, listId: number) => getFranchiseForList(listId))
+  ipcMain.handle('franchises:createList', (_e, collectionId: number) => createListForFranchise(collectionId))
+  ipcMain.handle('franchises:unlink',     (_e, listId: number) => updateList(listId, { tmdb_collection_id: null }))
+  ipcMain.handle('tmdb:addToWatchlist',   async (_e, tmdbId: number, tipo: 'filme' | 'serie', listId?: number) => {
+    try {
+      return { ok: true as const, data: await addTmdbToWatchlist(tmdbId, tipo, listId) }
+    } catch (err) {
+      log.error('tmdb:addToWatchlist', err)
+      return { ok: false as const, error: 'Não foi possível adicionar. Verifique sua conexão.' }
+    }
+  })
 
   // IA — erros viram { ok: false, error } com mensagem pronta para o usuário
   const aiCall = <T>(fn: () => Promise<T> | T) => async () => {
@@ -104,6 +130,9 @@ function registerIpcHandlers() {
     aiCall(() => setFeedback(tmdbId, tipo, title, year, verdict))())
   ipcMain.handle('ai:addToWatchlist', (_e, tmdbId: number, tipo: 'filme' | 'serie') =>
     aiCall(() => addSuggestionToWatchlist(tmdbId, tipo))())
+  ipcMain.handle('ai:completeList',  (_e, listId: number) => aiCall(() => completeList(listId))())
+  ipcMain.handle('ai:suggestLists',  () => aiCall(() => suggestLists())())
+  ipcMain.handle('ai:createList',    (_e, p: Parameters<typeof createListFromProposal>[0]) => aiCall(() => createListFromProposal(p))())
   ipcMain.handle('ai:addToCatalog', (_e, tmdbId: number, tipo: 'filme' | 'serie', fields: WatchedFields) =>
     aiCall(() => addSuggestionToCatalog(tmdbId, tipo, fields))())
 

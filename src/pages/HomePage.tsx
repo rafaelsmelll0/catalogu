@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { theme } from '../styles/theme.ts'
 import CatSit from '../assets/cat-sit.svg?react'
 import type { Media, WatchlistItem } from '../types/index.ts'
@@ -10,6 +9,7 @@ import { LazyMediaRow } from '../components/LazyMediaRow.tsx'
 import { MediaGridSkeleton } from '../components/MediaGridSkeleton.tsx'
 import { DetailsModal } from '../components/DetailsModal.tsx'
 import { WatchlistDetailsModal } from '../components/WatchlistDetailsModal.tsx'
+import { ListPickerModal } from '../components/ListPickerModal.tsx'
 import { Skeleton } from '../components/ui/index.ts'
 
 function hasAnyGenre(media: Media, genres: string[]): boolean {
@@ -47,9 +47,9 @@ const ROW_LIMIT = 12
 export function HomePage() {
   const { items, loading, fetchAll }                      = useMediaStore()
   const { items: watchlistItems, fetchAll: fetchWatchlist } = useWatchlistStore()
-  const navigate = useNavigate()
   const [selected, setSelected] = useState<Media | null>(null)
   const [selectedProximo, setSelectedProximo] = useState<WatchlistItem | null>(null)
+  const [listPickerFor, setListPickerFor]     = useState<Media | null>(null)
 
   // Cards de Próximos usam id negativo (como em Listas) para nunca colidir com o id
   // de uma mídia do catálogo; o clique abre os detalhes do item da fila.
@@ -179,7 +179,7 @@ export function HomePage() {
       <HeroBanner
         items={items}
         onDetailsClick={setSelected}
-        onAddToList={() => navigate('/listas')}
+        onAddToList={setListPickerFor}
       />
 
       <div style={{ paddingTop: theme.spacing.xl }}>
@@ -195,6 +195,12 @@ export function HomePage() {
 
       {selected && <DetailsModal media={selected} onClose={() => setSelected(null)} />}
       {selectedProximo && <WatchlistDetailsModal item={selectedProximo} onClose={() => setSelectedProximo(null)} />}
+      {listPickerFor && (
+        <ListPickerModal
+          target={{ kind: 'media', id: listPickerFor.id, title: listPickerFor.title }}
+          onClose={() => setListPickerFor(null)}
+        />
+      )}
     </div>
   )
 }

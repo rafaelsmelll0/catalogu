@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { TopNav } from './TopNav.tsx'
 import { TitleBar } from './TitleBar.tsx'
@@ -14,7 +15,9 @@ export function Layout() {
           key={location.pathname}
           style={{ animation: 'pageIn 0.3s ease-out' }}
         >
-          <Outlet />
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

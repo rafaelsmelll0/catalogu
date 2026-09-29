@@ -4,10 +4,15 @@ import type { WatchlistItem } from '../types/index.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { MarkAsWatchedModal } from './MarkAsWatchedModal.tsx'
 import { Modal, Button, Badge } from './ui/index.ts'
+import { TitleListsRow } from './TitleListsRow.tsx'
 
 interface Props {
   item:    WatchlistItem
   onClose: () => void
+  /** Aberto de dentro de uma lista: mostra "Remover desta lista". */
+  listContext?: { name: string; onRemove: () => void }
+  /** chamado depois de marcar como assistido (ex.: a lista recarregar) */
+  onWatched?: () => void
 }
 
 /**
@@ -15,14 +20,14 @@ interface Props {
  * são outras (marcar como assistido / tirar da fila) e porque o id do item é da
  * tabela watchlist — passar isso ao DetailsModal editaria/apagaria outra mídia.
  */
-export function WatchlistDetailsModal({ item, onClose }: Props) {
+export function WatchlistDetailsModal({ item, onClose, listContext, onWatched }: Props) {
   const removeItem = useWatchlistStore(s => s.removeItem)
   const [markWatched, setMarkWatched]     = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [removing, setRemoving]           = useState(false)
 
   if (markWatched) {
-    return <MarkAsWatchedModal item={item} onClose={() => setMarkWatched(false)} onDone={onClose} />
+    return <MarkAsWatchedModal item={item} onClose={() => setMarkWatched(false)} onDone={() => { onWatched?.(); onClose() }} />
   }
 
   async function handleRemove() {
@@ -91,10 +96,19 @@ export function WatchlistDetailsModal({ item, onClose }: Props) {
             </p>
           )}
 
+          <div style={{ marginBottom: theme.spacing.lg }}>
+            <TitleListsRow target={{ kind: 'watchlist', id: item.id, title: item.title }} onNavigate={onClose} />
+          </div>
+
           <div style={{
-            display: 'flex', gap: theme.spacing.sm, justifyContent: 'flex-end',
+            display: 'flex', gap: theme.spacing.sm, justifyContent: 'flex-end', flexWrap: 'wrap',
             paddingTop: theme.spacing.md, borderTop: `1px solid ${theme.colors.surface}`,
           }}>
+            {listContext && (
+              <Button variant="ghost" onClick={listContext.onRemove} style={{ marginRight: 'auto' }}>
+                Remover de "{listContext.name}"
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setConfirmRemove(true)}>Remover de Próximos</Button>
             <Button onClick={() => setMarkWatched(true)}>✓ Já assisti</Button>
           </div>

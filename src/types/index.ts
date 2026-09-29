@@ -152,3 +152,79 @@ export interface RecommendResult {
   items:       Suggestion[]
   discarded:   number
 }
+
+// ─── Listas v2 ──────────────────────────────────────────────────────────────
+
+export type ListKind     = 'franquia' | 'saga' | 'tema' | 'livre'
+export type ListSortMode = 'lancamento' | 'manual' | 'titulo' | 'nota'
+
+export const LIST_KIND_LABEL: Record<ListKind, { one: string; many: string }> = {
+  franquia: { one: 'Franquia', many: 'Franquias' },
+  saga:     { one: 'Saga',     many: 'Sagas e trilogias' },
+  tema:     { one: 'Tema',     many: 'Temas' },
+  livre:    { one: 'Livre',    many: 'Livres' },
+}
+
+export interface ListInfo {
+  id:                 number
+  name:               string
+  description:        string
+  kind:               ListKind
+  sort_mode:          ListSortMode
+  tmdb_collection_id: number | null
+  media_count:        number
+  watched_count:      number
+  avg_rating:         number | null
+  watched_minutes:    number
+}
+
+/** Item de lista: título do catálogo ou item de Próximos. */
+export interface ListEntryRef {
+  kind: 'media' | 'watchlist'
+  id:   number
+}
+
+export interface FranchisePart {
+  tmdbId:       number
+  title:        string
+  year:         string
+  releaseDate:  string
+  posterUrl:    string | null
+  where:        'catalogo' | 'proximos' | 'faltando'
+  watched:      boolean
+  upcoming:     boolean
+  mediaId?:     number
+  watchlistId?: number
+}
+
+export interface Franchise {
+  collectionId: number
+  name:         string
+  parts:        FranchisePart[]
+  owned:        number
+  watched:      number
+  inProximos:   number
+  missing:      number
+  upcoming:     number
+  listId:       number | null
+  listName:     string | null
+}
+
+export interface ListCandidateRef extends ListEntryRef {
+  title:      string
+  year:       string | null
+  cover_path: string | null
+  rating:     number | null
+}
+
+export interface ListCompletion {
+  fromCatalog: ListCandidateRef[]
+  discover:    Suggestion[]
+}
+
+export interface ListProposal {
+  name:        string
+  kind:        ListKind
+  description: string
+  items:       ListCandidateRef[]
+}

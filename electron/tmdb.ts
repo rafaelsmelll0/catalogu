@@ -32,6 +32,8 @@ export interface TmdbDetails {
   name?:               string
   first_air_date?:     string
   number_of_episodes?: number
+  vote_average?:       number
+  belongs_to_collection?: { id: number; name: string; poster_path: string | null } | null
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -114,4 +116,21 @@ export async function searchForMatch(
     year:          (r.release_date ?? r.first_air_date ?? '').slice(0, 4),
     voteCount:     r.vote_count ?? 0,
   }))
+}
+
+export interface TmdbCollection {
+  id:    number
+  name:  string
+  parts: { id: number; title: string; release_date: string; poster_path: string | null }[]
+}
+
+/** Coleção (franquia) do TMDB com os filmes que a compõem. */
+export async function getCollection(id: number): Promise<TmdbCollection> {
+  const url = `${BASE_URL}/collection/${id}?api_key=${API_KEY}&language=pt-BR`
+  const data = await fetchJson<{ id: number; name: string; parts?: { id: number; title: string; release_date?: string; poster_path: string | null }[] }>(url)
+  return {
+    id:    data.id,
+    name:  data.name,
+    parts: (data.parts ?? []).map(p => ({ id: p.id, title: p.title, release_date: p.release_date ?? '', poster_path: p.poster_path })),
+  }
 }
