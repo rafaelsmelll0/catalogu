@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { memo, type CSSProperties } from 'react'
 import sitRaw from '../assets/cat-sit.svg?raw'
 import logoRaw from '../assets/catalogu-logo.svg?raw'
 import rollRaw from '../assets/roll.svg?raw'
@@ -35,7 +35,12 @@ const LOGO: Parts = {
   pawL: 23, pawR: 24, whiskR: 32, whiskL: 36,
 }
 
-function build(raw: string, p: Partial<Parts> & Pick<Parts, 'reel' | 'reelCenter'>): { html: string; ratio: number } {
+/**
+ * O objeto de innerHTML é criado uma vez e reaproveitado: se cada render passar
+ * um objeto novo, o React recoloca o SVG e as animações recomeçam do zero (era o
+ * "flick" nas telas com cronômetro de espera).
+ */
+function build(raw: string, p: Partial<Parts> & Pick<Parts, 'reel' | 'reelCenter'>): { inner: { __html: string }; ratio: number } {
   const doc = new DOMParser().parseFromString(raw, 'image/svg+xml')
   const svg = doc.documentElement
   const [, , vw, vh] = (svg.getAttribute('viewBox') ?? '0 0 1 1').split(/[\s,]+/).map(Number)
@@ -61,7 +66,7 @@ function build(raw: string, p: Partial<Parts> & Pick<Parts, 'reel' | 'reelCenter
     els[i]?.setAttribute('style', `transform-origin: ${p.reelCenter[0]}px ${p.reelCenter[1]}px`)
   })
 
-  return { html: new XMLSerializer().serializeToString(svg), ratio: vh / vw }
+  return { inner: { __html: new XMLSerializer().serializeToString(svg) }, ratio: vh / vw }
 }
 
 // Rolo de filme: disco roxo, furos e eixo giram dentro do contorno
@@ -83,32 +88,32 @@ interface CatProps {
   style?: CSSProperties
 }
 
-export function AnimatedCat({ size = 120, mode = 'idle', style }: CatProps) {
-  const { html, ratio } = sit()
+export const AnimatedCat = memo(function AnimatedCat({ size = 120, mode = 'idle', style }: CatProps) {
+  const { inner, ratio } = sit()
   return (
     <span
       className={`acat acat-${mode}`}
       role="img"
       aria-label={mode === 'loading' ? 'Carregando' : 'Gatinho do Catalogu'}
       style={{ display: 'inline-block', width: size, height: size * ratio, ...style }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={inner}
     />
   )
-}
+})
 
 /** Logo com o gatinho que pisca de vez em quando e gira o rolo ao passar o mouse. */
-export function AnimatedLogo({ height = 36 }: { height?: number }) {
-  const { html, ratio } = logo()
+export const AnimatedLogo = memo(function AnimatedLogo({ height = 36 }: { height?: number }) {
+  const { inner, ratio } = logo()
   return (
     <span
       className="acat acat-logo"
       role="img"
       aria-label="Catalogu"
       style={{ display: 'block', height, width: height / ratio }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={inner}
     />
   )
-}
+})
 
 interface RollProps {
   /** lado em px */
@@ -119,15 +124,15 @@ interface RollProps {
 }
 
 /** Rolo de filme animado (telas vazias e indicador de carregamento pequeno). */
-export function AnimatedRoll({ size = 80, mode = 'idle', style }: RollProps) {
-  const { html } = roll()
+export const AnimatedRoll = memo(function AnimatedRoll({ size = 80, mode = 'idle', style }: RollProps) {
+  const { inner } = roll()
   return (
     <span
       className={`acat aroll aroll-${mode}`}
       role="img"
       aria-label={mode === 'spin' ? 'Carregando' : 'Rolo de filme'}
       style={{ display: 'inline-block', width: size, height: size, flexShrink: 0, ...style }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={inner}
     />
   )
-}
+})
