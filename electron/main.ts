@@ -223,6 +223,22 @@ function registerIpcHandlers() {
   })
   // O renderer pergunta o estado ao montar: o download pode ter terminado antes dele ouvir os eventos.
   ipcMain.handle('update:getState', () => updateStatus)
+  ipcMain.handle('app:version', () => app.getVersion())
+  // "Verificar atualizações" em Configurações. Se houver versão nova, o download
+  // começa sozinho e o card de atualização aparece como sempre.
+  ipcMain.handle('update:check', async () => {
+    if (!app.isPackaged) return { ok: false as const, error: 'Só funciona no app instalado.' }
+    if (updateStatus.state === 'downloading' || updateStatus.state === 'ready') {
+      return { ok: true as const, current: app.getVersion(), available: true, latest: updateStatus.version }
+    }
+    try {
+      const r = await autoUpdater.checkForUpdates()
+      return { ok: true as const, current: app.getVersion(), available: !!r?.isUpdateAvailable, latest: r?.updateInfo?.version ?? app.getVersion() }
+    } catch (err) {
+      log.error('Falha ao checar atualizações (manual):', err)
+      return { ok: false as const, error: 'Não foi possível verificar. Confira sua conexão.' }
+    }
+  })
   ipcMain.handle('update:retry', () => {
     updateStatus = { state: 'idle' }
     return autoUpdater.checkForUpdates().catch(err => log.error('Falha ao checar atualizações:', err))
@@ -318,6 +334,14 @@ function setupAutoUpdater(win: BrowserWindow) {
 
   // checkForUpdates (sem "AndNotify"): o aviso é o card do próprio app, sem notificação nativa duplicada.
   autoUpdater.checkForUpdates().catch(err => log.error('Falha ao checar atualizações:', err))
+
+  // Também com o app aberto: uma versão publicada depois da abertura (ou que o
+  // GitHub ainda servia do cache naquele momento) aparece sem precisar reiniciar.
+  setInterval(() => {
+    if (updateStatus.state === 'idle' || updateStatus.state === 'error') {
+      autoUpdater.checkForUpdates().catch(err => log.error('Falha ao checar atualizações:', err))
+    }
+  }, 30 * 60 * 1000)
 }
 
 /** Data local YYYY-MM-DD (toISOString usa UTC e vira o dia seguinte à noite no Brasil). */

@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// electron-log fora do Electron grava em %APPDATA%/catalogu/logs — a mesma pasta
+// do app instalado. Nos testes, silencia para não sujar o log real.
+vi.mock('electron-log', () => ({ default: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } }))
 import { formatCatalog, buildRecommendMessages, buildProfileMessages, buildSweepListsMessages, type CatalogEntry } from '../aiPrompts.js'
 import { titlesMatch, pickCandidate, type MatchCandidate } from '../aiMatch.js'
 import { parseJsonLoose } from '../aiClient.js'

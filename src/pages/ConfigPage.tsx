@@ -5,6 +5,7 @@ import { useMediaStore } from '../store/mediaStore.ts'
 import { useWatchlistStore } from '../store/watchlistStore.ts'
 import { showToast } from '../components/Toast.tsx'
 import { AiSettingsSection } from '../components/AiSettingsSection.tsx'
+import { AboutSection } from '../components/AboutSection.tsx'
 
 interface ImageProgress {
   current: number
@@ -328,6 +329,8 @@ export function ConfigPage() {
           </div>
         )}
       </div>
+
+      <AboutSection sectionStyle={sectionStyle} />
 
       {/* Atalhos de teclado */}
       <div style={sectionStyle}>
